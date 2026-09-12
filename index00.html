@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>まつお建設出面管理</title>
+  <style>
+    /* ==========================================
+       全体スタイル
+       ========================================== */
+    :root {
+      --primary-color: #f59e0b;
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --header-bg: #0f172a;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding-top: 56px;
+      padding-bottom: 70px;
+    }
+
+    /* 上部ヘッダー */
+    header {
+      position: fixed; top: 0; left: 0; right: 0; height: 56px;
+      background-color: var(--header-bg); color: #fff;
+      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+      z-index: 100;
+    }
+    .header-icon {
+      background: var(--primary-color); color: #fff;
+      width: 32px; height: 32px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 18px;
+    }
+    .header-title { font-size: 15px; font-weight: bold; }
+    .header-subtitle { font-size: 10px; color: #94a3b8; }
+
+    /* 下部フッターナビゲーション */
+    nav.bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 64px;
+      background: #fff; border-top: 1px solid var(--border-color);
+      display: flex; justify-content: space-around; align-items: center;
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--text-muted); text-decoration: none; font-size: 11px; font-weight: bold;
+      background: none; border: none; cursor: pointer; flex: 1; height: 100%;
+    }
+    .nav-item.active { color: var(--primary-color); }
+    .nav-icon { font-size: 18px; margin-bottom: 2px; }
+
+    /* メインコンテンツ枠 */
+    .container {
+      max-width: 500px;
+      margin: 16px auto;
+      padding: 0 12px;
+    }
+
+    /* 各画面切り替え */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* カードコンテナ */
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card-title {
+      font-size: 14px; font-weight: bold; color: var(--text-main);
+      margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+    }
+
+    /* フォームパーツ */
+    .form-group { margin-bottom: 12px; }
+    .form-label { font-size: 12px; font-weight: bold; color: var(--text-muted); margin-bottom: 6px; display: block; }
+    .form-control {
+      width: 100%; padding: 10px 12px; font-size: 14px;
+      border: 1px solid var(--border-color); border-radius: 8px;
+      background: #f8fafc; color: var(--text-main); outline: none;
+    }
+    .form-control:focus { border-color: var(--primary-color); background: #fff; }
+
+    /* ボタン */
+    .btn {
+      width: 100%; padding: 12px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: bold; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      margin-bottom: 8px;
+    }
+    .btn-primary { background: var(--primary-color); color: #fff; }
+    .btn-green { background: #10b981; color: #fff; }
+    .btn-blue { background: #3b82f6; color: #fff; }
+    
+    /* マスタ登録用のインライン追加ボタン */
+    .btn-add {
+      background: var(--primary-color); color: #fff; border: none;
+      border-radius: 8px; padding: 0 16px; font-weight: bold; font-size: 14px;
+      cursor: pointer; white-space: nowrap; height: 42px;
+    }
+    .btn-delete {
+      color: #ef4444; background: none; border: none; font-size: 12px; font-weight: bold; cursor: pointer;
+    }
+
+    /* 設定サブタブ（カプセル型） */
+    .sub-tabs {
+      display: flex; background: #e2e8f0; padding: 3px; border-radius: 10px;
+      margin-bottom: 16px; overflow-x: auto;
+    }
+    .sub-tab-btn {
+      flex: 1; min-width: 64px; padding: 8px 4px; border: none; background: transparent;
+      font-size: 12px; font-weight: bold; color: var(--text-muted); border-radius: 8px;
+      cursor: pointer; text-align: center; white-space: nowrap;
+    }
+    .sub-tab-btn.active { background: #fff; color: var(--primary-color); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    .sub-tab-content { display: none; }
+    .sub-tab-content.active { display: block; }
+
+    /* 出面入力 */
+    .worker-card { background: #fff; border-radius: 10px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-color); }
+    .worker-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .btn-group-attendance { display: flex; gap: 6px; }
+    .btn-att {
+      flex: 1; padding: 8px 0; border: 1px solid var(--border-color); background: #f8fafc;
+      border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; color: var(--text-muted);
+    }
+    .btn-att.active-full { background: #10b981; color: #fff; border-color: #10b981; }
+    .btn-att.active-half { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+    .btn-att.active-off { background: #64748b; color: #fff; border-color: #64748b; }
+
+    .site-banner {
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+      padding: 10px 14px; display: flex; justify-content: space-between;
+      font-size: 13px; font-weight: bold; color: #b45309; margin-bottom: 12px;
+    }
+
+    /* 出面プレビュー */
+    .preview-box { background: #fff; border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-top: 12px; }
+    .preview-title { text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 8px; }
+    .preview-sub { text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+
+    /* 帳票スタイル */
+    .report-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: center; }
+    .report-table th, .report-table td { border: 1px solid #cbd5e1; padding: 4px 2px; }
+    .report-table th { background-color: #f8fafc; }
+
+    /* 印刷用スタイル */
+    @media print {
+      body * { visibility: hidden !important; }
+      body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
+      #attendance-box, #attendance-box * { visibility: visible !important; }
+      #attendance-box {
+        position: absolute !important; left: 0 !important; top: 0 !important;
+        width: 100% !important; margin: 0 !important; padding: 20px !important;
+        border: 1px solid #cbd5e1 !important; border-radius: 12px !important;
+        box-shadow: none !important; background: #fff !important;
+      }
+      #report-attendance-table-container { overflow: visible !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header>
+    <div class="header-icon">⛑</div>
+    <div>
+      <div class="header-title">まつお建設出面管理</div>
+      <div class="header-subtitle">現場作業・出面管理システム</div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- 0. HOME 画面 -->
+    <div id="page-home" class="page active">
+      <div class="card" style="text-align: center; padding: 24px 16px;">
+        <div style="font-size: 40px; margin-bottom: 8px;">🏗️</div>
+        <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">まつお建設出面管理</h2>
+        <p style="font-size: 12px; color: var(--text-muted);">現場の出面記録・請求管理・バックアップ操作を行えます。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💾 データの保存と復元（バックアップ）</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+          端末内に最新データを保存したり、バックアップファイルを選択してデータを復元することができます。
+        </p>
+        
+        <button class="btn btn-green" onclick="exportDataToFile()">
+          📥 データの保存（ファイル出力）
+        </button>
+        
+        <button class="btn btn-blue" onclick="document.getElementById('import-file-input').click()">
+          📤 データの復元（ファイル読み込み）
+        </button>
+        <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="importDataFromFile(event)">
+      </div>
+    </div>
+
+    <!-- 1. 出面入力 画面 -->
+    <div id="page-entry" class="page">
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">📅 作業日付</label>
+          <input type="date" id="entry-date" class="form-control" value="2026-09-10" onchange="renderEntryWorkers()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">🏢 元請会社を選択</label>
+          <select id="entry-client-select" class="form-control" onchange="filterEntrySites()">
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">📍 現場を選択</label>
+          <select id="entry-site-select" class="form-control" onchange="updateEntrySiteBanner(); renderEntryWorkers();">
+          </select>
+        </div>
+      </div>
+
+      <div class="site-banner">
+        <span id="banner-site-name">未選択</span>
+        <span id="banner-client-name">-</span>
+      </div>
+
+      <div id="entry-worker-list">
+      </div>
+    </div>
+
+    <!-- 2. 出面・請求書 画面 -->
+    <div id="page-report" class="page">
+      <div class="card no-print">
+        <div class="card-title">📄 出面表・請求書の作成</div>
+        <div class="form-group">
+          <label class="form-label">元請会社</label>
+          <select id="report-client-select" class="form-control" onchange="filterReportSites(); generateReport();">
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">対象現場 (任意)</label>
+          <select id="report-site-select" class="form-control" onchange="generateReport()">
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">対象年月</label>
+          <input type="month" id="report-month" class="form-control" value="2026-09" onchange="generateReport()">
+        </div>
+        <button class="btn btn-primary" onclick="generateReport()">🔄 集計・プレビュー更新</button>
+      </div>
+
+      <div class="no-print" style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button class="btn btn-green" onclick="window.print()">📥 出面表をPDF保存</button>
+        <button class="btn btn-blue" onclick="alert('メールソフトを起動します。')">✉️ メール起動</button>
+      </div>
+
+      <!-- 帳票プレビュー枠 -->
+      <div class="print-page">
+        <!-- 出面表カード（PDF出力対象） -->
+        <div class="preview-box" id="attendance-box">
+          <div class="preview-title">出 面 表</div>
+          <div class="preview-sub" id="report-attendance-subtitle">2026年09月分（元請：全社対象 御中 / 現場：全現場対象）</div>
+          <div style="overflow-x: auto;" id="report-attendance-table-container">
+            <!-- 出面表テーブル領域 -->
+          </div>
+        </div>
+
+        <!-- 請求書ボックス（画面表示のみ） -->
+        <div class="preview-box" id="invoice-box" style="margin-top: 16px;">
+          <div class="preview-title">御 請 求 書</div>
+          <div style="font-size: 11px; display:flex; justify-content:space-between; margin-top:8px; margin-bottom:12px;">
+            <div><strong id="report-invoice-client-name">元請会社 御中</strong></div>
+            <div>請求日: <span id="report-invoice-date">2026/09/12</span></div>
+          </div>
+          <div id="report-invoice-detail-container">
+            <!-- 請求書内訳領域 -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 設定・マスタ 画面 -->
+    <div id="page-settings" class="page">
+      <div class="sub-tabs">
+        <button class="sub-tab-btn active" onclick="openSubTab(event, 'sub-tab-worker')">人・機械</button>
+        <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-client')">元請社</button>
+        <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-site')">現場</button>
+        <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-price')">単価</button>
+        <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-company')">自社情報</button>
+      </div>
+
+      <!-- サブタブ1：人・機械 -->
+      <div id="sub-tab-worker" class="sub-tab-content active">
+        <div class="card">
+          <div class="card-title"><span style="color:var(--primary-color);">👥</span> 社員・重機の登録</div>
+          <div class="form-group">
+            <input type="text" id="input-worker-name" class="form-control" placeholder="名前 / 機械名 (例: 山田太郎)">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <select id="input-worker-type" class="form-control" style="flex:1;">
+              <option value="作業員">作業員</option>
+              <option value="重機・車両">重機・車両</option>
+            </select>
+            <button class="btn-add" onclick="addWorker()">追加</button>
+          </div>
+        </div>
+        <div id="worker-list-container"></div>
+      </div>
+
+      <!-- サブタブ2：元請社 -->
+      <div id="sub-tab-client" class="sub-tab-content">
+        <div class="card">
+          <div class="card-title"><span style="color:var(--primary-color);">🏢</span> 元請会社の登録 (締め日)</div>
+          <div class="form-group">
+            <input type="text" id="input-client-name" class="form-control" placeholder="元請会社名">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <select id="input-client-closing" class="form-control" style="flex:1;">
+              <option value="末日締め">末日締め</option>
+              <option value="20日締め">20日締め</option>
+              <option value="25日締め">25日締め</option>
+            </select>
+            <button class="btn-add" onclick="addClient()">追加</button>
+          </div>
+        </div>
+        <div id="client-list-container"></div>
+      </div>
+
+      <!-- サブタブ3：現場 -->
+      <div id="sub-tab-site" class="sub-tab-content">
+        <div class="card">
+          <div class="card-title"><span style="color:var(--primary-color);">📍</span> 現場の登録</div>
+          <div class="form-group">
+            <select id="input-site-client" class="form-control"></select>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="input-site-name" class="form-control" placeholder="現場名" style="flex:1;">
+            <button class="btn-add" onclick="addSite()">追加</button>
+          </div>
+        </div>
+        <div id="site-list-container"></div>
+      </div>
+
+      <!-- サブタブ4：単価 -->
+      <div id="sub-tab-price" class="sub-tab-content">
+        <div class="card">
+          <div class="card-title"><span style="color:var(--primary-color);">¥</span> 現場ごとの単価設定</div>
+          <div class="form-group">
+            <label class="form-label">🏢 元請会社を選択</label>
+            <select id="price-client-select" class="form-control" onchange="filterPriceSites()"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">📍 現場を選択</label>
+            <select id="price-site-select" class="form-control" onchange="renderPriceList()"></select>
+          </div>
+          <div id="price-list-container"></div>
+        </div>
+      </div>
+
+      <!-- サブタブ5：自社情報 -->
+      <div id="sub-tab-company" class="sub-tab-content">
+        <div class="card">
+          <div class="card-title">🏢 自社基本情報設定</div>
+          <div class="form-group"><label class="form-label">社名</label><input type="text" id="comp-name" class="form-control"></div>
+          <div class="form-group"><label class="form-label">代表者名</label><input type="text" id="comp-owner" class="form-control"></div>
+          <div class="form-group"><label class="form-label">郵便番号</label><input type="text" id="comp-zip" class="form-control"></div>
+          <div class="form-group"><label class="form-label">住所</label><input type="text" id="comp-address" class="form-control"></div>
+          <div class="form-group"><label class="form-label">電話番号</label><input type="tel" id="comp-tel" class="form-control"></div>
+          <div class="form-group"><label class="form-label">FAX番号</label><input type="tel" id="comp-fax" class="form-control"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🏦 振込口座情報 (請求書出力用)</div>
+          <div class="form-group"><label class="form-label">銀行名</label><input type="text" id="bank-name" class="form-control"></div>
+          <div class="form-group"><label class="form-label">支店名</label><input type="text" id="bank-branch" class="form-control"></div>
+          <div class="form-group">
+            <label class="form-label">科目名</label>
+            <select id="bank-type" class="form-control">
+              <option value="普通">普通</option>
+              <option value="当座">当座</option>
+              <option value="定期">定期</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">支店番号</label><input type="text" id="bank-branch-num" class="form-control" maxlength="3"></div>
+          <div class="form-group"><label class="form-label">通帳番号</label><input type="text" id="bank-account-num" class="form-control" maxlength="7"></div>
+          <div class="form-group"><label class="form-label">口座名義（カタカナ）</label><input type="text" id="bank-account-name" class="form-control"></div>
+          <button class="btn btn-primary" onclick="saveCompanyInfo()">自社情報を保存</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 下部メインナビゲーション -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchPage('page-home', this)">
+      <span class="nav-icon">🏠</span>
+      <span>HOME</span>
+    </button>
+    <button class="nav-item" onclick="switchPage('page-entry', this)">
+      <span class="nav-icon">📅</span>
+      <span>出面入力</span>
+    </button>
+    <button class="nav-item" onclick="switchPage('page-report', this)">
+      <span class="nav-icon">📄</span>
+      <span>出面・請求書</span>
+    </button>
+    <button class="nav-item" onclick="switchPage('page-settings', this)">
+      <span class="nav-icon">⚙️</span>
+      <span>設定・マスタ</span>
+    </button>
+  </nav>
+
+  <script>
+    let masterData = JSON.parse(localStorage.getItem('app_master_data')) || {
+      workers: [{ id: 1, name: '松尾 賢一', type: '作業員' }],
+      clients: [{ id: 1, name: 'サイキ建設工業', closing: '末日締め' }],
+      sites: [{ id: 1, name: '自転車道', clientId: 1 }],
+      prices: { "1-1": 18000 },
+      company: {},
+      attendance: { "2026-09-10_1_1": 1.0 }
+    };
+
+    if (!masterData.attendance) masterData.attendance = {};
+
+    function saveData() {
+      localStorage.setItem('app_master_data', JSON.stringify(masterData));
+      renderAll();
+    }
+
+    function exportDataToFile() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(masterData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `matsuo_demen_data_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importDataFromFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (confirm('現在のデータを上書きして復元しますか？')) {
+            masterData = importedData;
+            saveData();
+            loadCompanyInfo();
+            alert('データを正常に復元しました。');
+          }
+        } catch (err) {
+          alert('ファイルの読み込みに失敗しました。');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function switchPage(pageId, btn) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+      btn.classList.add('active');
+      if (pageId === 'page-report') {
+        generateReport();
+      }
+    }
+
+    function openSubTab(evt, tabId) {
+      document.querySelectorAll('.sub-tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      evt.currentTarget.classList.add('active');
+    }
+
+    function filterEntrySites() {
+      const clientId = parseInt(document.getElementById('entry-client-select').value);
+      const entrySiteSelect = document.getElementById('entry-site-select');
+
+      const filteredSites = clientId
+        ? masterData.sites.filter(s => s.clientId === clientId)
+        : masterData.sites;
+
+      entrySiteSelect.innerHTML = filteredSites.length > 0
+        ? filteredSites.map(s => `<option value="${s.id}">${s.name}</option>`).join('')
+        : '<option value="">-- 現場がありません --</option>';
+
+      updateEntrySiteBanner();
+      renderEntryWorkers();
+    }
+
+    function setAttendance(workerId, val) {
+      const date = document.getElementById('entry-date').value;
+      const siteId = parseInt(document.getElementById('entry-site-select').value);
+      if (!date || !siteId) return alert('日付と現場を選択してください');
+
+      const key = `${date}_${siteId}_${workerId}`;
+      masterData.attendance[key] = val;
+      localStorage.setItem('app_master_data', JSON.stringify(masterData));
+      renderEntryWorkers();
+    }
+
+    function renderEntryWorkers() {
+      const date = document.getElementById('entry-date').value;
+      const siteId = parseInt(document.getElementById('entry-site-select').value);
+      const container = document.getElementById('entry-worker-list');
+
+      if (!siteId) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:13px;">現場が登録・選択されていません</div>';
+        return;
+      }
+
+      container.innerHTML = masterData.workers.map(w => {
+        const key = `${date}_${siteId}_${w.id}`;
+        const currentVal = masterData.attendance[key] !== undefined ? masterData.attendance[key] : null;
+
+        return `
+          <div class="worker-card">
+            <div class="worker-header">
+              <span style="font-weight: bold;">${w.name}</span>
+              <span style="font-size: 10px; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${w.type}</span>
+            </div>
+            <div class="btn-group-attendance">
+              <button class="btn-att ${currentVal === 1.0 ? 'active-full' : ''}" onclick="setAttendance(${w.id}, 1.0)">1日 (1.0)</button>
+              <button class="btn-att ${currentVal === 0.5 ? 'active-half' : ''}" onclick="setAttendance(${w.id}, 0.5)">半日 (0.5)</button>
+              <button class="btn-att ${currentVal === 0 ? 'active-off' : ''}" onclick="setAttendance(${w.id}, 0)">休み (0)</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterReportSites() {
+      const clientId = parseInt(document.getElementById('report-client-select').value);
+      const reportSiteSelect = document.getElementById('report-site-select');
+      
+      const filteredSites = clientId 
+        ? masterData.sites.filter(s => s.clientId === clientId)
+        : masterData.sites;
+
+      reportSiteSelect.innerHTML = '<option value="">全現場対象</option>' + 
+        filteredSites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    }
+
+    function generateReport() {
+      const clientId = parseInt(document.getElementById('report-client-select').value);
+      const siteId = parseInt(document.getElementById('report-site-select').value);
+      const monthStr = document.getElementById('report-month').value;
+
+      const client = masterData.clients.find(c => c.id === clientId);
+      const clientName = client ? client.name : '全社対象';
+      const site = masterData.sites.find(s => s.id === siteId);
+      const siteName = site ? site.name : '全現場対象';
+
+      document.getElementById('report-attendance-subtitle').innerText = `${monthStr.replace('-', '年')}月分（元請：${clientName} 御中 / 現場：${siteName}）`;
+      document.getElementById('report-invoice-client-name').innerText = `${clientName} 御中`;
+      document.getElementById('report-invoice-date').innerText = new Date().toLocaleDateString('ja-JP');
+
+      if (!monthStr) return;
+
+      const [year, month] = monthStr.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+      let targetSiteIds = [];
+      if (siteId) {
+        targetSiteIds = [siteId];
+      } else if (clientId) {
+        targetSiteIds = masterData.sites.filter(s => s.clientId === clientId).map(s => s.id);
+      } else {
+        targetSiteIds = masterData.sites.map(s => s.id);
+      }
+
+      /* テーブルヘッダーの組み立て（日付行 ＋ 曜日行） */
+      let tableHtml = `<table class="report-table"><thead><tr><th>名前</th>`;
+      for (let d = 1; d <= daysInMonth; d++) {
+        tableHtml += `<th>${d}</th>`;
+      }
+      tableHtml += `<th rowspan="2" style="vertical-align:middle;">計</th></tr><tr><th style="font-size:10px; color:var(--text-muted);">曜日</th>`;
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateObj = new Date(year, month - 1, d);
+        const dayOfWeek = dateObj.getDay();
+        const dayName = weekDays[dayOfWeek];
+        
+        let style = '';
+        if (dayOfWeek === 0) style = 'color: #ef4444;';
+        if (dayOfWeek === 6) style = 'color: #3b82f6;';
+
+        tableHtml += `<th style="${style}">${dayName}</th>`;
+      }
+      tableHtml += `</tr></thead><tbody>`;
+
+      let invoiceItems = [];
+
+      masterData.workers.forEach(w => {
+        let rowHtml = `<tr><td style="font-weight:bold; white-space:nowrap; text-align:left; padding:4px 6px;">${w.name}</td>`;
+        let totalDays = 0;
+        let totalAmount = 0;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dayStr = String(d).padStart(2, '0');
+          const dateKey = `${monthStr}-${dayStr}`;
+
+          let dayValSum = 0;
+          targetSiteIds.forEach(sId => {
+            const attKey = `${dateKey}_${sId}_${w.id}`;
+            if (masterData.attendance[attKey]) {
+              dayValSum += masterData.attendance[attKey];
+              const priceKey = `${sId}-${w.id}`;
+              const unitPrice = masterData.prices[priceKey] || 0;
+              totalAmount += (unitPrice * masterData.attendance[attKey]);
+            }
+          });
+
+          totalDays += dayValSum;
+          rowHtml += `<td>${dayValSum > 0 ? dayValSum : ''}</td>`;
+        }
+
+        rowHtml += `<td style="font-weight:bold; background-color:#f1f5f9;">${totalDays > 0 ? totalDays : 0}</td></tr>`;
+        tableHtml += rowHtml;
+
+        if (totalDays > 0) {
+          invoiceItems.push({
+            name: w.name,
+            days: totalDays,
+            amount: totalAmount
+          });
+        }
+      });
+
+      tableHtml += `</tbody></table>`;
+      document.getElementById('report-attendance-table-container').innerHTML = tableHtml;
+
+      let grandTotal = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
+      let tax = Math.floor(grandTotal * 0.1);
+      let totalWithTax = grandTotal + tax;
+
+      let invoiceHtml = `
+        <table class="report-table" style="margin-bottom:12px;">
+          <thead>
+            <tr bgColor="#f8fafc">
+              <th style="text-align:left; padding:4px 6px;">項目 / 作業員名</th>
+              <th>人工数</th>
+              <th style="text-align:right; padding:4px 6px;">金額 (税込)</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      if (invoiceItems.length === 0) {
+        invoiceHtml += `<tr><td colspan="3" style="padding:10px; color:var(--text-muted);">対象期間の出面データがありません</td></tr>`;
+      } else {
+        invoiceItems.forEach(item => {
+          invoiceHtml += `
+            <tr>
+              <td style="text-align:left; padding:4px 6px;">${item.name} 出面作業</td>
+              <td>${item.days} 工数</td>
+              <td style="text-align:right; padding:4px 6px;">¥${item.amount.toLocaleString()}</td>
+            </tr>
+          `;
+        });
+      }
+
+      const comp = masterData.company || {};
+
+      invoiceHtml += `
+          </tbody>
+        </table>
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; border-top:2px solid #1e293b; padding-top:8px;">
+          <div style="font-size:10px; color:var(--text-muted); text-align:left;">
+            <div><strong>【振込口座】</strong></div>
+            <div>${comp.bankName || '〇〇銀行'} ${comp.bankBranch || '本店営業部'} (${comp.bankType || '普通'}) ${comp.bankAccountNum || '1234567'}</div>
+            <div>口座名義: ${comp.bankAccountName || '自社口座名義'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px;">小計: ¥${grandTotal.toLocaleString()} / 消費税(10%): ¥${tax.toLocaleString()}</div>
+            <div style="font-size:16px; font-weight:bold; color:var(--text-main);">合計請求額: ¥${totalWithTax.toLocaleString()}</div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('report-invoice-detail-container').innerHTML = invoiceHtml;
+    }
+
+    function addWorker() {
+      const name = document.getElementById('input-worker-name').value.trim();
+      const type = document.getElementById('input-worker-type').value;
+      if (!name) return alert('名前/機械名を入力してください');
+      
+      masterData.workers.push({ id: Date.now(), name, type });
+      document.getElementById('input-worker-name').value = '';
+      saveData();
+    }
+
+    function deleteWorker(id) {
+      if (!confirm('削除しますか？')) return;
+      masterData.workers = masterData.workers.filter(w => w.id !== id);
+      saveData();
+    }
+
+    function renderWorkers() {
+      const container = document.getElementById('worker-list-container');
+      container.innerHTML = masterData.workers.map(w => `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-weight:bold; font-size:15px; margin-bottom:6px;">${w.name}</div>
+              <span style="font-size: 10px; background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${w.type}</span>
+            </div>
+            <button class="btn-delete" onclick="deleteWorker(${w.id})">削除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addClient() {
+      const name = document.getElementById('input-client-name').value.trim();
+      const closing = document.getElementById('input-client-closing').value;
+      if (!name) return alert('元請会社名を入力してください');
+
+      masterData.clients.push({ id: Date.now(), name, closing });
+      document.getElementById('input-client-name').value = '';
+      saveData();
+    }
+
+    function deleteClient(id) {
+      if (!confirm('削除しますか？')) return;
+      masterData.clients = masterData.clients.filter(c => c.id !== id);
+      masterData.sites = masterData.sites.filter(s => s.clientId !== id);
+      saveData();
+    }
+
+    function renderClients() {
+      const container = document.getElementById('client-list-container');
+      container.innerHTML = masterData.clients.map(c => `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-weight:bold; font-size:15px; margin-bottom:4px;">${c.name}</div>
+              <div style="font-size: 12px; color: var(--text-muted);">${c.closing}</div>
+            </div>
+            <button class="btn-delete" onclick="deleteClient(${c.id})">削除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addSite() {
+      const clientId = parseInt(document.getElementById('input-site-client').value);
+      const name = document.getElementById('input-site-name').value.trim();
+      if (!clientId) return alert('元請会社を選択してください');
+      if (!name) return alert('現場名を入力してください');
+
+      masterData.sites.push({ id: Date.now(), name, clientId });
+      document.getElementById('input-site-name').value = '';
+      saveData();
+    }
+
+    function deleteSite(id) {
+      if (!confirm('削除しますか？')) return;
+      masterData.sites = masterData.sites.filter(s => s.id !== id);
+      saveData();
+    }
+
+    function renderSites() {
+      const container = document.getElementById('site-list-container');
+      container.innerHTML = masterData.sites.map(s => {
+        const client = masterData.clients.find(c => c.id === s.clientId);
+        return `
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <div style="font-weight:bold; font-size:15px; margin-bottom:4px;">${s.name}</div>
+                <div style="font-size: 12px; color: var(--text-muted);">${client ? client.name : '未所属'}</div>
+              </div>
+              <button class="btn-delete" onclick="deleteSite(${s.id})">削除</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterPriceSites() {
+      const clientId = parseInt(document.getElementById('price-client-select').value);
+      const priceSiteSelect = document.getElementById('price-site-select');
+
+      const filteredSites = clientId
+        ? masterData.sites.filter(s => s.clientId === clientId)
+        : masterData.sites;
+
+      priceSiteSelect.innerHTML = filteredSites.length > 0
+        ? filteredSites.map(s => `<option value="${s.id}">${s.name}</option>`).join('')
+        : '<option value="">-- 現場がありません --</option>';
+
+      renderPriceList();
+    }
+
+    function updatePrice(siteId, workerId, value) {
+      const key = `${siteId}-${workerId}`;
+      masterData.prices[key] = parseInt(value) || 0;
+      localStorage.setItem('app_master_data', JSON.stringify(masterData));
+    }
+
+    function renderPriceList() {
+      const siteId = parseInt(document.getElementById('price-site-select').value);
+      const container = document.getElementById('price-list-container');
+      if (!siteId) {
+        container.innerHTML = '<div style="font-size:12px; color:var(--text-muted); margin-top:12px;">現場を選択してください</div>';
+        return;
+      }
+
+      container.innerHTML = masterData.workers.map(w => {
+        const key = `${siteId}-${w.id}`;
+        const price = masterData.prices[key] || 0;
+        return `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <span style="font-weight:bold; font-size:14px;">${w.name}</span>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="color:var(--text-muted);">¥</span>
+              <input type="number" class="form-control" value="${price}" 
+                     style="width:120px; text-align:right; font-weight:bold;"
+                     onchange="updatePrice(${siteId}, ${w.id}, this.value)">
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function saveCompanyInfo() {
+      masterData.company = {
+        name: document.getElementById('comp-name').value,
+        owner: document.getElementById('comp-owner').value,
+        zip: document.getElementById('comp-zip').value,
+        address: document.getElementById('comp-address').value,
+        tel: document.getElementById('comp-tel').value,
+        fax: document.getElementById('comp-fax').value,
+        bankName: document.getElementById('bank-name').value,
+        bankBranch: document.getElementById('bank-branch').value,
+        bankType: document.getElementById('bank-type').value,
+        bankBranchNum: document.getElementById('bank-branch-num').value,
+        bankAccountNum: document.getElementById('bank-account-num').value,
+        bankAccountName: document.getElementById('bank-account-name').value,
+      };
+      saveData();
+      alert('自社情報を保存しました');
+    }
+
+    function loadCompanyInfo() {
+      const c = masterData.company || {};
+      if (c.name) document.getElementById('comp-name').value = c.name;
+      if (c.owner) document.getElementById('comp-owner').value = c.owner;
+      if (c.zip) document.getElementById('comp-zip').value = c.zip;
+      if (c.address) document.getElementById('comp-address').value = c.address;
+      if (c.tel) document.getElementById('comp-tel').value = c.tel;
+      if (c.fax) document.getElementById('comp-fax').value = c.fax;
+      if (c.bankName) document.getElementById('bank-name').value = c.bankName;
+      if (c.bankBranch) document.getElementById('bank-branch').value = c.bankBranch;
+      if (c.bankType) document.getElementById('bank-type').value = c.bankType;
+      if (c.bankBranchNum) document.getElementById('bank-branch-num').value = c.bankBranchNum;
+      if (c.bankAccountNum) document.getElementById('bank-account-num').value = c.bankAccountNum;
+      if (c.bankAccountName) document.getElementById('bank-account-name').value = c.bankAccountName;
+    }
+
+    function renderDropdowns() {
+      const siteClientSelect = document.getElementById('input-site-client');
+      siteClientSelect.innerHTML = '<option value="">-- 元請会社を選択 --</option>' + 
+        masterData.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      const entryClientSelect = document.getElementById('entry-client-select');
+      entryClientSelect.innerHTML = '<option value="">-- すべての元請社 --</option>' + 
+        masterData.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      filterEntrySites();
+
+      const reportClientSelect = document.getElementById('report-client-select');
+      reportClientSelect.innerHTML = '<option value="">全社対象</option>' + 
+        masterData.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      filterReportSites();
+
+      const priceClientSelect = document.getElementById('price-client-select');
+      priceClientSelect.innerHTML = '<option value="">-- すべての元請社 --</option>' + 
+        masterData.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      filterPriceSites();
+    }
+
+    function updateEntrySiteBanner() {
+      const siteId = parseInt(document.getElementById('entry-site-select').value);
+      const site = masterData.sites.find(s => s.id === siteId);
+      if (site) {
+        const client = masterData.clients.find(c => c.id === site.clientId);
+        document.getElementById('banner-site-name').innerText = site.name;
+        document.getElementById('banner-client-name').innerText = client ? client.name : '-';
+      } else {
+        document.getElementById('banner-site-name').innerText = '未選択';
+        document.getElementById('banner-client-name').innerText = '-';
+      }
+    }
+
+    function renderAll() {
+      renderWorkers();
+      renderClients();
+      renderSites();
+      renderDropdowns();
+      renderEntryWorkers();
+      updateEntrySiteBanner();
+      generateReport();
+    }
+
+    loadCompanyInfo();
+    renderAll();
+  </script>
+</body>
+</html>
