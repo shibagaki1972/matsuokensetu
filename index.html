@@ -312,9 +312,8 @@
         <button class="btn btn-primary" onclick="generateReport()">🔄 集計・プレビュー更新</button>
       </div>
 
-      <div class="no-print" style="display: flex; gap: 8px; margin-bottom: 12px;">
-        <button class="btn btn-green" onclick="saveAttendancePDF()">📥 出面表を保存（指定先）</button>
-        <button class="btn btn-blue" onclick="alert('メールソフトを起動します。')">✉️ メール起動</button>
+      <div class="no-print" style="margin-bottom: 12px;">
+        <button class="btn btn-green" onclick="saveAttendancePDF()">📥 出面表をPDFで保存</button>
       </div>
 
       <!-- 帳票プレビュー枠 -->
@@ -496,7 +495,6 @@
       const dataStr = JSON.stringify(masterData, null, 2);
       const defaultFileName = `matsuo_demen_data_${new Date().toISOString().slice(0,10)}.json`;
 
-      // File System Access API対応ブラウザ（Chrome / Edge等）の場合
       if ('showSaveFilePicker' in window) {
         try {
           const handle = await window.showSaveFilePicker({
@@ -512,11 +510,10 @@
           alert('指定された保存先に全データを正常に保存しました。');
           return;
         } catch (err) {
-          if (err.name === 'AbortError') return; // キャンセル時
+          if (err.name === 'AbortError') return;
         }
       }
 
-      // 非対応またはフォールバック（iOS Safari / 各種スマホブラウザ等）
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -528,9 +525,22 @@
       URL.revokeObjectURL(url);
     }
 
-    /* 2. 出面表の保存（ユーザー指定の保存先を選択して保存） */
+    /* 2. 出面表の保存（出面表●●年●月元請会社名現場名.pdf の形式で出力） */
     async function saveAttendancePDF() {
       const monthStr = document.getElementById('report-month').value || '2026-09';
+      const [year, month] = monthStr.split('-').map(Number);
+      
+      const clientId = parseInt(document.getElementById('report-client-select').value);
+      const siteId = parseInt(document.getElementById('report-site-select').value);
+      
+      const client = masterData.clients.find(c => c.id === clientId);
+      const clientName = client ? client.name : '全社対象';
+      const site = masterData.sites.find(s => s.id === siteId);
+      const siteName = site ? site.name : '全現場対象';
+
+      // 指定されたファイル名形式を作成（例: 出面表2026年9月サイキ建設工業自転車道.pdf）
+      const defaultFileName = `出面表${year}年${month}月${clientName}${siteName}.pdf`;
+
       const attendanceContent = document.getElementById('attendance-box').outerHTML;
       
       const fullHtml = `
@@ -538,7 +548,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>出面表_${monthStr}</title>
+  <title>${defaultFileName.replace('.pdf', '')}</title>
   <style>
     body { font-family: sans-serif; padding: 20px; color: #0f172a; }
     .preview-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; }
@@ -555,15 +565,13 @@
 </body>
 </html>`;
 
-      const defaultFileName = `出面表_${monthStr}.html`;
-
       if ('showSaveFilePicker' in window) {
         try {
           const handle = await window.showSaveFilePicker({
             suggestedName: defaultFileName,
             types: [{
-              description: 'HTML File (Web Document)',
-              accept: { 'text/html': ['.html'] },
+              description: 'PDF Document',
+              accept: { 'application/pdf': ['.pdf'] },
             }],
           });
           const writable = await handle.createWritable();
@@ -576,8 +584,8 @@
         }
       }
 
-      // フォールバック保存
-      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      // フォールバック処理
+      const blob = new Blob([fullHtml], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
