@@ -89,7 +89,7 @@
       margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
     }
 
-    /* フォームパーツ（スマホ操作用サイズ向上） */
+    /* フォームパーツ */
     .form-group { margin-bottom: 14px; }
     .form-label { font-size: 13px; font-weight: bold; color: var(--text-muted); margin-bottom: 6px; display: block; }
     .form-control {
@@ -100,7 +100,7 @@
     }
     .form-control:focus { border-color: var(--primary-color); background: #fff; }
 
-    /* ボタン（押しやすいようタッチターゲット拡大） */
+    /* ボタン */
     .btn {
       width: 100%; height: 48px; border-radius: 8px; border: none;
       font-size: 15px; font-weight: bold; cursor: pointer;
@@ -167,7 +167,7 @@
       border-radius: 6px;
     }
 
-    /* 出面表テーブル（スマホ閲覧用・Sticky列） */
+    /* 出面表テーブル */
     .report-table {
       width: 100%;
       min-width: 650px;
@@ -179,7 +179,7 @@
     .report-table th, .report-table td { border: 1px solid #cbd5e1; padding: 5px 2px; }
     .report-table th { background-color: #f8fafc; }
 
-    /* 1列目（作業員名）の固定指定 */
+    /* 1列目（作業員名）固定 */
     .report-table th:first-child,
     .report-table td:first-child {
       position: sticky;
@@ -198,9 +198,6 @@
     .invoice-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
     .invoice-table th, .invoice-table td { border: 1px solid #cbd5e1; padding: 8px 6px; }
 
-    /* ==========================================
-       印刷用スタイル（A4用紙に最適配置）
-       ========================================== */
     @media print {
       body * { visibility: hidden !important; }
       body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
@@ -252,11 +249,11 @@
       <div class="card">
         <div class="card-title">💾 データの保存と復元（バックアップ）</div>
         <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
-          端末内に最新データを保存したり、バックアップファイルを選択してデータを復元することができます。
+          全データを任意の場所を指定して保存したり、保存したファイルからデータを復元できます。
         </p>
         
         <button class="btn btn-green" onclick="exportDataToFile()">
-          📥 データの保存（ファイル出力）
+          📥 データの保存（保存先を指定）
         </button>
         
         <button class="btn btn-blue" onclick="document.getElementById('import-file-input').click()">
@@ -316,13 +313,13 @@
       </div>
 
       <div class="no-print" style="display: flex; gap: 8px; margin-bottom: 12px;">
-        <button class="btn btn-green" onclick="window.print()">📥 出面表をPDF保存</button>
+        <button class="btn btn-green" onclick="saveAttendancePDF()">📥 出面表を保存（指定先）</button>
         <button class="btn btn-blue" onclick="alert('メールソフトを起動します。')">✉️ メール起動</button>
       </div>
 
       <!-- 帳票プレビュー枠 -->
       <div class="print-page">
-        <!-- 出面表カード（PDF出力対象） -->
+        <!-- 出面表カード -->
         <div class="preview-box" id="attendance-box">
           <div class="preview-title">出 面 表</div>
           <div class="preview-sub" id="report-attendance-subtitle">2026年09月分（元請：全社対象 御中 / 現場：全現場対象）</div>
@@ -331,7 +328,7 @@
           </div>
         </div>
 
-        <!-- 請求書ボックス（画面表示のみ） -->
+        <!-- 請求書ボックス -->
         <div class="preview-box" id="invoice-box" style="margin-top: 16px;">
           <div class="preview-title">御 請 求 書</div>
           <div style="font-size: 11px; display:flex; justify-content:space-between; margin-top:8px; margin-bottom:12px;">
@@ -494,14 +491,101 @@
       renderAll();
     }
 
-    function exportDataToFile() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(masterData, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `matsuo_demen_data_${new Date().toISOString().slice(0,10)}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
+    /* 1. 全データの保存（ユーザー指定の保存先に書き出し） */
+    async function exportDataToFile() {
+      const dataStr = JSON.stringify(masterData, null, 2);
+      const defaultFileName = `matsuo_demen_data_${new Date().toISOString().slice(0,10)}.json`;
+
+      // File System Access API対応ブラウザ（Chrome / Edge等）の場合
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: defaultFileName,
+            types: [{
+              description: 'JSON Data File',
+              accept: { 'application/json': ['.json'] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(dataStr);
+          await writable.close();
+          alert('指定された保存先に全データを正常に保存しました。');
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return; // キャンセル時
+        }
+      }
+
+      // 非対応またはフォールバック（iOS Safari / 各種スマホブラウザ等）
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    /* 2. 出面表の保存（ユーザー指定の保存先を選択して保存） */
+    async function saveAttendancePDF() {
+      const monthStr = document.getElementById('report-month').value || '2026-09';
+      const attendanceContent = document.getElementById('attendance-box').outerHTML;
+      
+      const fullHtml = `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>出面表_${monthStr}</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; color: #0f172a; }
+    .preview-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; }
+    .preview-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+    .preview-sub { text-align: center; font-size: 12px; color: #64748b; margin-bottom: 16px; }
+    .table-scroll-container { width: 100%; overflow-x: auto; }
+    .report-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: center; }
+    .report-table th, .report-table td { border: 1px solid #cbd5e1; padding: 6px 4px; }
+    .report-table th { background-color: #f8fafc; }
+  </style>
+</head>
+<body>
+  ${attendanceContent}
+</body>
+</html>`;
+
+      const defaultFileName = `出面表_${monthStr}.html`;
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: defaultFileName,
+            types: [{
+              description: 'HTML File (Web Document)',
+              accept: { 'text/html': ['.html'] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(fullHtml);
+          await writable.close();
+          alert('出面表ファイルを指定されたフォルダに保存しました。');
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+
+      // フォールバック保存
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
     function importDataFromFile(event) {
@@ -640,7 +724,6 @@
         targetSiteIds = masterData.sites.map(s => s.id);
       }
 
-      /* 出面表テーブル生成（Sticky・レスポンシブ対応） */
       let tableHtml = `<table class="report-table"><thead><tr><th>名前</th>`;
       for (let d = 1; d <= daysInMonth; d++) {
         tableHtml += `<th>${d}</th>`;
