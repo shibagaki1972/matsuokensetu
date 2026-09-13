@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>まつお建設出面管理</title>
+  <!-- SheetJS (Excel解析・生成用ライブラリ) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- html2canvas + jsPDF (PDF出力用ライブラリ) -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     /* ==========================================
        全体スタイル（スマホファースト最適化）
@@ -66,7 +71,7 @@
     /* メインコンテンツ枠 */
     .container {
       width: 100%;
-      max-width: 600px;
+      max-width: 800px;
       margin: 0 auto;
       padding: 12px 12px;
     }
@@ -99,6 +104,7 @@
       -webkit-appearance: none;
     }
     .form-control:focus { border-color: var(--primary-color); background: #fff; }
+    textarea.form-control { height: 80px; padding: 8px 12px; resize: vertical; }
 
     /* ボタン */
     .btn {
@@ -110,6 +116,7 @@
     .btn-primary { background: var(--primary-color); color: #fff; }
     .btn-green { background: #10b981; color: #fff; }
     .btn-blue { background: #3b82f6; color: #fff; }
+    .btn-excel { background: #059669; color: #fff; }
     
     .btn-add {
       background: var(--primary-color); color: #fff; border: none;
@@ -134,6 +141,20 @@
     .sub-tab-btn.active { background: #fff; color: var(--primary-color); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .sub-tab-content { display: none; }
     .sub-tab-content.active { display: block; }
+
+    /* 請求書設定用の内部サブタブ（二つのタブ） */
+    .invoice-sub-tabs {
+      display: flex; background: #cbd5e1; padding: 3px; border-radius: 8px;
+      margin-bottom: 14px;
+    }
+    .invoice-sub-tab-btn {
+      flex: 1; padding: 6px; border: none; background: transparent;
+      font-size: 12px; font-weight: bold; color: #475569; border-radius: 6px;
+      cursor: pointer; text-align: center;
+    }
+    .invoice-sub-tab-btn.active { background: #fff; color: var(--primary-color); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    .invoice-sub-content { display: none; }
+    .invoice-sub-content.active { display: block; }
 
     /* 出面入力 */
     .worker-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; border: 1px solid var(--border-color); }
@@ -179,7 +200,6 @@
     .report-table th, .report-table td { border: 1px solid #cbd5e1; padding: 5px 2px; }
     .report-table th { background-color: #f8fafc; }
 
-    /* 1列目（作業員名）固定 */
     .report-table th:first-child,
     .report-table td:first-child {
       position: sticky;
@@ -198,30 +218,45 @@
     .invoice-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
     .invoice-table th, .invoice-table td { border: 1px solid #cbd5e1; padding: 8px 6px; }
 
+    /* Excelマッピングツール用スタイル */
+    .mapping-item { border: 1px solid #e0e0e0; padding: 8px; border-radius: 6px; background: #fafafa; margin-bottom: 6px; }
+    .mapping-item.active { border-color: #3498db; background: #ebf5fb; }
+    .mapping-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 12px; margin-bottom: 4px; }
+    .badge-required { background: #ef4444; color: white; font-size: 9px; padding: 2px 5px; border-radius: 4px; }
+    .badge-optional { background: #94a3b8; color: white; font-size: 9px; padding: 2px 5px; border-radius: 4px; }
+    .mapping-controls { display: flex; gap: 6px; align-items: center; }
+    .target-val-input { flex: 1; height: 32px; padding: 0 8px; font-size: 12px; text-align: center; font-weight: bold; }
+    .btn-sm { padding: 4px 10px; height: 32px; font-size: 12px; border-radius: 4px; border: none; cursor: pointer; }
+    .btn-select { background: #3b82f6; color: white; }
+    .btn-skip { background: #e2e8f0; color: #64748b; }
+
+    /* Excelプレビューエリア */
+    .excel-preview-wrapper { margin-top: 10px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #fff; }
+    .excel-preview-header { background: #0f172a; color: #fff; padding: 8px 12px; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+    .excel-table-container { max-height: 350px; overflow: auto; background: #fff; }
+    
+    table.excel-grid { border-collapse: collapse; font-family: monospace, sans-serif; font-size: 11px; width: 100%; }
+    table.excel-grid th, table.excel-grid td { border: 1px solid #d0d0d0; padding: 4px 6px; white-space: nowrap; text-align: left; height: 22px; min-width: 50px; }
+    table.excel-grid th { background: #f1f5f9; color: #475569; text-align: center; font-weight: normal; user-select: none; }
+    table.excel-grid td { cursor: pointer; }
+    table.excel-grid td:hover { background: #e0f2fe !important; outline: 1px solid #0284c7; }
+    table.excel-grid td.highlight-active { background: #fef08a !important; outline: 2px solid #eab308; }
+    table.excel-grid td.highlight-mapped { background: #dcfce7 !important; font-weight: bold; }
+
     @media print {
       body * { visibility: hidden !important; }
       body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
       
-      #attendance-box, #attendance-box * { visibility: visible !important; }
-      #attendance-box {
+      #attendance-box, #attendance-box *, #invoice-box, #invoice-box * { visibility: visible !important; }
+      .print-page {
         position: absolute !important; left: 0 !important; top: 0 !important;
         width: 100% !important; margin: 0 !important; padding: 10px !important;
         border: none !important; box-shadow: none !important; background: #fff !important;
       }
-
       .table-scroll-container { overflow: visible !important; border: none !important; }
-      
-      .report-table {
-        min-width: 100% !important;
-        width: 100% !important;
-        font-size: 9px !important;
-      }
+      .report-table { min-width: 100% !important; width: 100% !important; font-size: 9px !important; }
       .report-table th, .report-table td { padding: 3px 1px !important; }
-      .report-table th:first-child, .report-table td:first-child {
-        position: static !important;
-        box-shadow: none !important;
-        border-right: 1px solid #cbd5e1 !important;
-      }
+      .report-table th:first-child, .report-table td:first-child { position: static !important; box-shadow: none !important; }
     }
   </style>
 </head>
@@ -296,8 +331,13 @@
       <div class="card no-print">
         <div class="card-title">📄 出面表・請求書の作成</div>
         <div class="form-group">
-          <label class="form-label">元請会社</label>
+          <label class="form-label">元請会社（宛名）</label>
           <select id="report-client-select" class="form-control" onchange="filterReportSites(); generateReport();">
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">請求の名称（設定テンプレート）</label>
+          <select id="report-template-select" class="form-control" onchange="generateReport()">
           </select>
         </div>
         <div class="form-group">
@@ -309,11 +349,17 @@
           <label class="form-label">対象年月</label>
           <input type="month" id="report-month" class="form-control" value="2026-09" onchange="generateReport()">
         </div>
+        <div class="form-group">
+          <label class="form-label">請求書 備考欄（都度入力可能）</label>
+          <textarea id="report-invoice-remark" class="form-control" placeholder="振込手数料は貴社にてご負担願います。〇〇現場分 など" oninput="generateReport()"></textarea>
+        </div>
         <button class="btn btn-primary" onclick="generateReport()">🔄 集計・プレビュー更新</button>
       </div>
 
-      <div class="no-print" style="margin-bottom: 12px;">
+      <div class="no-print" style="margin-bottom: 12px; display:flex; flex-direction:column; gap:8px;">
         <button class="btn btn-green" onclick="saveAttendancePDF()">📥 出面表をPDFで保存</button>
+        <button class="btn btn-blue" onclick="saveInvoicePDF()">📥 請求書をPDFで保存</button>
+        <button class="btn btn-excel" onclick="saveInvoiceExcel()">📊 請求書をExcelで保存</button>
       </div>
 
       <!-- 帳票プレビュー枠 -->
@@ -331,11 +377,17 @@
         <div class="preview-box" id="invoice-box" style="margin-top: 16px;">
           <div class="preview-title">御 請 求 書</div>
           <div style="font-size: 11px; display:flex; justify-content:space-between; margin-top:8px; margin-bottom:12px;">
-            <div><strong id="report-invoice-client-name">元請会社 御中</strong></div>
-            <div>請求日: <span id="report-invoice-date">2026/09/12</span></div>
+            <div><strong id="report-invoice-client-name" style="font-size:14px;">元請会社 御中</strong></div>
+            <div style="text-align:right;">
+              <div>請求日: <span id="report-invoice-date">2026/09/12</span></div>
+              <div id="report-invoice-company-name" style="font-weight:bold; margin-top:4px;">まつお建設</div>
+            </div>
           </div>
           <div id="report-invoice-detail-container">
             <!-- 請求書内訳領域 -->
+          </div>
+          <div id="report-invoice-mapping-info" style="margin-top:10px; font-size:10px; color:#94a3b8; text-align:right;">
+            <!-- マッピング適用状況を表示 -->
           </div>
         </div>
       </div>
@@ -348,7 +400,7 @@
         <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-client')">元請社</button>
         <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-site')">現場</button>
         <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-price')">単価</button>
-        <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-company')">自社情報</button>
+        <button class="sub-tab-btn" onclick="openSubTab(event, 'sub-tab-invoice-config')">請求書設定</button>
       </div>
 
       <!-- サブタブ1：人・機械 -->
@@ -419,35 +471,265 @@
         </div>
       </div>
 
-      <!-- サブタブ5：自社情報 -->
-      <div id="sub-tab-company" class="sub-tab-content">
-        <div class="card">
-          <div class="card-title">🏢 自社基本情報設定</div>
-          <div class="form-group"><label class="form-label">社名</label><input type="text" id="comp-name" class="form-control"></div>
-          <div class="form-group"><label class="form-label">代表者名</label><input type="text" id="comp-owner" class="form-control"></div>
-          <div class="form-group"><label class="form-label">郵便番号</label><input type="text" id="comp-zip" class="form-control"></div>
-          <div class="form-group"><label class="form-label">住所</label><input type="text" id="comp-address" class="form-control"></div>
-          <div class="form-group"><label class="form-label">電話番号</label><input type="tel" id="comp-tel" class="form-control"></div>
-          <div class="form-group"><label class="form-label">FAX番号</label><input type="tel" id="comp-fax" class="form-control"></div>
+      <!-- サブタブ5：請求書設定（中に「基本設定」と「テンプレート」の2タブを内包） -->
+      <div id="sub-tab-invoice-config" class="sub-tab-content">
+        
+        <!-- 二つの内部タブ切替ボタン -->
+        <div class="invoice-sub-tabs">
+          <button class="invoice-sub-tab-btn active" onclick="openInvoiceSubTab(event, 'inv-sub-info')">1. 自社・口座基本設定</button>
+          <button class="invoice-sub-tab-btn" onclick="openInvoiceSubTab(event, 'inv-sub-template')">2. テンプレート・マッピング</button>
         </div>
 
-        <div class="card">
-          <div class="card-title">🏦 振込口座情報 (請求書出力用)</div>
-          <div class="form-group"><label class="form-label">銀行名</label><input type="text" id="bank-name" class="form-control"></div>
-          <div class="form-group"><label class="form-label">支店名</label><input type="text" id="bank-branch" class="form-control"></div>
-          <div class="form-group">
-            <label class="form-label">科目名</label>
-            <select id="bank-type" class="form-control">
-              <option value="普通">普通</option>
-              <option value="当座">当座</option>
-              <option value="定期">定期</option>
-            </select>
+        <!-- 内部タブ1：自社情報・口座情報（実データ入力） -->
+        <div id="inv-sub-info" class="invoice-sub-content active">
+
+          <div class="card">
+            <div class="card-title">📝 自社および口座の実データ（保持用）</div>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">ここで入力した内容が請求書に差し込まれる実際の値です。Excel内のどのセルに差し込むかは「2. テンプレート・マッピング」タブでまとめて指定します。</p>
+            <div class="form-group"><label class="form-label">実際の社名</label><input type="text" id="comp-name" class="form-control"></div>
+            <div class="form-group"><label class="form-label">実際の代表者名</label><input type="text" id="comp-owner" class="form-control"></div>
+            <div class="form-group"><label class="form-label">実際の〒</label><input type="text" id="comp-zip" class="form-control"></div>
+            <div class="form-group"><label class="form-label">実際の住所</label><input type="text" id="comp-address" class="form-control"></div>
+            <div class="form-group"><label class="form-label">実際の電話番号</label><input type="tel" id="comp-tel" class="form-control"></div>
+            <div class="form-group"><label class="form-label">実際のFAX番号</label><input type="tel" id="comp-fax" class="form-control"></div>
+            <div class="form-group"><label class="form-label">実際の銀行名</label><input type="text" id="bank-name" class="form-control"></div>
+            <div class="form-group"><label class="form-label">実際の支店名</label><input type="text" id="bank-branch" class="form-control"></div>
+            <div class="form-group">
+              <label class="form-label">実際の口座種別</label>
+              <select id="bank-type" class="form-control">
+                <option value="普通">普通</option>
+                <option value="当座">当座</option>
+                <option value="定期">定期</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">実際の口座番号</label><input type="text" id="bank-account-num" class="form-control"></div>
+            <div class="form-group"><label class="form-label">実際の口座名義</label><input type="text" id="bank-account-name" class="form-control"></div>
+            
+            <button class="btn btn-primary" onclick="saveCompanyInfo()">自社情報を保存</button>
           </div>
-          <div class="form-group"><label class="form-label">支店番号</label><input type="text" id="bank-branch-num" class="form-control" maxlength="3"></div>
-          <div class="form-group"><label class="form-label">通帳番号</label><input type="text" id="bank-account-num" class="form-control" maxlength="7"></div>
-          <div class="form-group"><label class="form-label">口座名義（カタカナ）</label><input type="text" id="bank-account-name" class="form-control"></div>
-          <button class="btn btn-primary" onclick="saveCompanyInfo()">自社情報を保存</button>
         </div>
+
+        <!-- 内部タブ2：Excelテンプレート & ビジュアルマッピング -->
+        <div id="inv-sub-template" class="invoice-sub-content">
+          <div class="card">
+            <div class="card-title"><span style="color:var(--primary-color);">📑</span> 請求書テンプレート作成</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+              請求書Excelを1つ読み込み、同じプレビュー上で「自社情報・口座情報・宛名・現場名・単価」などすべてのセル位置を指定できます。作成した設定は名前を付けて保存できます。
+            </p>
+            <div class="form-group">
+              <label class="form-label">📝 請求名称（設定の保存名）</label>
+              <input type="text" id="config-template-name" class="form-control" placeholder="例: 自社標準フォーマット, ○○社共通様式">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">📁 請求書テンプレートファイル（.xlsx）</label>
+              <input type="file" id="invoice-template-file" class="form-control" accept=".xlsx, .xls" onchange="handleTemplateUpload(event)">
+              <div id="template-file-status" style="font-size:11px; color:#10b981; margin-top:4px;"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">📌 セル位置指定（同じプレビューで全項目を選択）</div>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">「選択」ボタンを押してから、下のプレビューのセルをクリックしてください。</p>
+
+            <div style="font-size:12px; font-weight:bold; color:var(--primary-color); margin-bottom:6px;">【自社情報】</div>
+            <div class="mapping-item" id="item-comp_name">
+              <div class="mapping-header">社名 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-comp-name" class="form-control target-val-input" placeholder="例: F3">
+                <button class="btn-sm btn-select" onclick="activateMapping('comp_name')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-comp_owner">
+              <div class="mapping-header">代表者名 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-comp-owner" class="form-control target-val-input" placeholder="例: F4">
+                <button class="btn-sm btn-select" onclick="activateMapping('comp_owner')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-comp_zip">
+              <div class="mapping-header">郵便番号 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-comp-zip" class="form-control target-val-input" placeholder="例: F5">
+                <button class="btn-sm btn-select" onclick="activateMapping('comp_zip')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-comp_address">
+              <div class="mapping-header">住所 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-comp-address" class="form-control target-val-input" placeholder="例: F6">
+                <button class="btn-sm btn-select" onclick="activateMapping('comp_address')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-comp_tel">
+              <div class="mapping-header">電話番号 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-comp-tel" class="form-control target-val-input" placeholder="例: F7">
+                <button class="btn-sm btn-select" onclick="activateMapping('comp_tel')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-comp_fax">
+              <div class="mapping-header">FAX番号 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-comp-fax" class="form-control target-val-input" placeholder="例: F8">
+                <button class="btn-sm btn-select" onclick="activateMapping('comp_fax')">選択</button>
+              </div>
+            </div>
+
+            <div style="font-size:12px; font-weight:bold; color:var(--primary-color); margin:12px 0 6px 0;">【振込口座情報】</div>
+            <div class="mapping-item" id="item-bank_name">
+              <div class="mapping-header">銀行名 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-bank-name" class="form-control target-val-input" placeholder="例: B25">
+                <button class="btn-sm btn-select" onclick="activateMapping('bank_name')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-bank_branch">
+              <div class="mapping-header">支店名 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-bank-branch" class="form-control target-val-input" placeholder="例: B26">
+                <button class="btn-sm btn-select" onclick="activateMapping('bank_branch')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-bank_type">
+              <div class="mapping-header">普通/当座 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-bank-type" class="form-control target-val-input" placeholder="例: B27">
+                <button class="btn-sm btn-select" onclick="activateMapping('bank_type')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-bank_account_num">
+              <div class="mapping-header">口座番号 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-bank-account-num" class="form-control target-val-input" placeholder="例: B28">
+                <button class="btn-sm btn-select" onclick="activateMapping('bank_account_num')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-bank_account_name">
+              <div class="mapping-header">口座名義 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-bank-account-name" class="form-control target-val-input" placeholder="例: B29">
+                <button class="btn-sm btn-select" onclick="activateMapping('bank_account_name')">選択</button>
+              </div>
+            </div>
+
+            <div style="font-size:12px; font-weight:bold; color:var(--primary-color); margin:12px 0 6px 0;">【共通項目 (固定セル)】</div>
+            <div class="mapping-item" id="item-client">
+              <div class="mapping-header">宛名 (元請名) <span class="badge-required">必須</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-client" class="form-control target-val-input" placeholder="例: B4">
+                <button class="btn-sm btn-select" onclick="activateMapping('client')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-date">
+              <div class="mapping-header">請求日 <span class="badge-required">必須</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-date" class="form-control target-val-input" placeholder="例: F2">
+                <button class="btn-sm btn-select" onclick="activateMapping('date')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-total">
+              <div class="mapping-header">請求金額 (合計) <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-total" class="form-control target-val-input" placeholder="例: C8">
+                <button class="btn-sm btn-select" onclick="activateMapping('total')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-remark">
+              <div class="mapping-header">備考欄 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-remark" class="form-control target-val-input" placeholder="例: B24">
+                <button class="btn-sm btn-select" onclick="activateMapping('remark')">選択</button>
+              </div>
+            </div>
+
+            <div style="font-size:12px; font-weight:bold; color:var(--primary-color); margin:12px 0 6px 0;">【明細項目 (開始セル / 列)】</div>
+            
+            <div class="mapping-item" id="item-detail_start">
+              <div class="mapping-header">明細データ開始行 <span class="badge-required">必須</span></div>
+              <div class="mapping-controls">
+                <input type="number" id="map-detail-start" class="form-control target-val-input" placeholder="例: 14">
+                <button class="btn-sm btn-select" onclick="activateMapping('detail_start')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-col_site">
+              <div class="mapping-header">項目 / 現場名 列 <span class="badge-required">必須</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-col-site" class="form-control target-val-input" placeholder="例: B">
+                <button class="btn-sm btn-select" onclick="activateMapping('col_site')">選択</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-col_qty">
+              <div class="mapping-header">数量 列 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-col-qty" class="form-control target-val-input" placeholder="例: D">
+                <button class="btn-sm btn-select" onclick="activateMapping('col_qty')">選択</button>
+                <button class="btn-sm btn-skip" onclick="skipMapping('col_qty')">なし</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-col_unit">
+              <div class="mapping-header">単位 列 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-col-unit" class="form-control target-val-input" placeholder="例: E">
+                <button class="btn-sm btn-select" onclick="activateMapping('col_unit')">選択</button>
+                <button class="btn-sm btn-skip" onclick="skipMapping('col_unit')">なし</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-col_price">
+              <div class="mapping-header">単価 列 <span class="badge-optional">任意</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-col-price" class="form-control target-val-input" placeholder="例: F">
+                <button class="btn-sm btn-select" onclick="activateMapping('col_price')">選択</button>
+                <button class="btn-sm btn-skip" onclick="skipMapping('col_price')">なし</button>
+              </div>
+            </div>
+
+            <div class="mapping-item" id="item-col_amount">
+              <div class="mapping-header">金額 列 <span class="badge-required">必須</span></div>
+              <div class="mapping-controls">
+                <input type="text" id="map-col-amount" class="form-control target-val-input" placeholder="例: G">
+                <button class="btn-sm btn-select" onclick="activateMapping('col_amount')">選択</button>
+              </div>
+            </div>
+
+            <!-- Excelプレビュー領域 -->
+            <div class="excel-preview-wrapper">
+              <div class="excel-preview-header">
+                <span>📊 Excel プレビュー画面</span>
+                <span id="excel-active-status" style="font-size:11px; color:#fde047;">項目を選択してセルをクリック</span>
+              </div>
+              <div class="excel-table-container" id="previewArea">
+                <p style="color: #64748b; text-align: center; padding: 30px; font-size: 12px;">
+                  テンプレートExcel（.xlsx）をアップロードするとここにプレビューが表示されます。
+                </p>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" style="margin-top:14px;" onclick="saveClientInvoiceMapping()">名前を付けてこの請求書設定を保存</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">📚 登録済み請求書設定一覧</div>
+            <div id="invoice-mapping-list-container"></div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -480,17 +762,49 @@
       sites: [{ id: 1, name: '自転車道', clientId: 1 }],
       prices: { "1-1": 18000 },
       company: {},
+      invoiceMappings: {},
       attendance: { "2026-09-10_1_1": 1.0 }
     };
 
     if (!masterData.attendance) masterData.attendance = {};
+    if (!masterData.invoiceMappings) masterData.invoiceMappings = {};
+
+    // 旧バージョン（自社情報タブに専用のセル位置設定があった頃）のデータを、
+    // 統合後の請求書設定（テンプレート・マッピング）に一度だけ引き継ぐ
+    if (masterData.company && masterData.company.mapCompName !== undefined && !masterData.company._mappingMigrated) {
+      const migratedKey = masterData.company._migratedKeyName || '以前の自社設定（自動移行）';
+      if (!masterData.invoiceMappings[migratedKey]) {
+        masterData.invoiceMappings[migratedKey] = {
+          mapCompName: masterData.company.mapCompName || '',
+          mapCompOwner: masterData.company.mapCompOwner || '',
+          mapCompZip: masterData.company.mapCompZip || '',
+          mapCompAddress: masterData.company.mapCompAddress || '',
+          mapCompTel: masterData.company.mapCompTel || '',
+          mapCompFax: masterData.company.mapCompFax || '',
+          mapBankName: masterData.company.mapBankName || '',
+          mapBankBranch: masterData.company.mapBankBranch || '',
+          mapBankType: masterData.company.mapBankType || '',
+          mapBankAccountNum: masterData.company.mapBankAccountNum || '',
+          mapBankAccountName: masterData.company.mapBankAccountName || ''
+        };
+      }
+      masterData.company._mappingMigrated = true;
+      localStorage.setItem('app_master_data', JSON.stringify(masterData));
+    }
+
+    let loadedWorkbook = null;
+    let currentActiveField = null;
 
     function saveData() {
-      localStorage.setItem('app_master_data', JSON.stringify(masterData));
+      try {
+        localStorage.setItem('app_master_data', JSON.stringify(masterData));
+      } catch (e) {
+        alert('データの保存に失敗しました（保存容量の上限の可能性があります）。テンプレートExcelのファイルサイズをご確認ください。');
+        console.error(e);
+      }
       renderAll();
     }
 
-    /* 1. 全データの保存（ユーザー指定の保存先に書き出し） */
     async function exportDataToFile() {
       const dataStr = JSON.stringify(masterData, null, 2);
       const defaultFileName = `matsuo_demen_data_${new Date().toISOString().slice(0,10)}.json`;
@@ -499,15 +813,12 @@
         try {
           const handle = await window.showSaveFilePicker({
             suggestedName: defaultFileName,
-            types: [{
-              description: 'JSON Data File',
-              accept: { 'application/json': ['.json'] },
-            }],
+            types: [{ description: 'JSON Data File', accept: { 'application/json': ['.json'] } }],
           });
           const writable = await handle.createWritable();
           await writable.write(dataStr);
           await writable.close();
-          alert('指定された保存先に全データを正常に保存しました。');
+          alert('指定された保存実に全データを正常に保存しました。');
           return;
         } catch (err) {
           if (err.name === 'AbortError') return;
@@ -525,74 +836,434 @@
       URL.revokeObjectURL(url);
     }
 
-    /* 2. 出面表の保存（出面表●●年●月元請会社名現場名.pdf の形式で出力） */
-    async function saveAttendancePDF() {
-      const monthStr = document.getElementById('report-month').value || '2026-09';
-      const [year, month] = monthStr.split('-').map(Number);
-      
-      const clientId = parseInt(document.getElementById('report-client-select').value);
-      const siteId = parseInt(document.getElementById('report-site-select').value);
-      
-      const client = masterData.clients.find(c => c.id === clientId);
-      const clientName = client ? client.name : '全社対象';
-      const site = masterData.sites.find(s => s.id === siteId);
-      const siteName = site ? site.name : '全現場対象';
+    // 指定した要素を画像化してA4サイズの本物のPDF（Blob）に変換する共通処理
+    // ※横スクロール枠（.table-scroll-container）は展開してから撮影し、
+    //   複数ページにまたがる場合は自動的にページを追加する
+    // クローン内の「横スクロール枠」と「先頭列の固定表示(sticky)」を、
+    // PDF化した際に崩れたり余分な断片が出たりしないよう無効化する
+    function prepareCloneForPdf(clone) {
+      clone.querySelectorAll('.table-scroll-container').forEach(el => {
+        el.style.overflow = 'visible';
+        el.style.width = 'max-content';
+      });
+      clone.querySelectorAll('.report-table').forEach(el => {
+        el.style.minWidth = '0';
+      });
+      clone.querySelectorAll('.report-table tr').forEach(tr => {
+        const firstCell = tr.firstElementChild;
+        if (firstCell) {
+          firstCell.style.position = 'static';
+          firstCell.style.left = 'auto';
+          firstCell.style.boxShadow = 'none';
+        }
+      });
+      return clone;
+    }
 
-      // 指定されたファイル名形式を作成（例: 出面表2026年9月サイキ建設工業自転車道.pdf）
-      const defaultFileName = `出面表${year}年${month}月${clientName}${siteName}.pdf`;
+    // 指定した要素（複数可）を画面外の白背景ラッパーに並べてhtml2canvasで撮影する
+    async function captureElementsToCanvas(elements) {
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'fixed';
+      wrapper.style.top = '0';
+      wrapper.style.left = '-9999px';
+      wrapper.style.display = 'inline-block';
+      wrapper.style.background = '#ffffff';
+      wrapper.style.padding = '16px';
 
-      const attendanceContent = document.getElementById('attendance-box').outerHTML;
-      
-      const fullHtml = `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>${defaultFileName.replace('.pdf', '')}</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; color: #0f172a; }
-    .preview-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; }
-    .preview-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 8px; }
-    .preview-sub { text-align: center; font-size: 12px; color: #64748b; margin-bottom: 16px; }
-    .table-scroll-container { width: 100%; overflow-x: auto; }
-    .report-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: center; }
-    .report-table th, .report-table td { border: 1px solid #cbd5e1; padding: 6px 4px; }
-    .report-table th { background-color: #f8fafc; }
-  </style>
-</head>
-<body>
-  ${attendanceContent}
-</body>
-</html>`;
+      elements.forEach(el => {
+        if (el) wrapper.appendChild(prepareCloneForPdf(el.cloneNode(true)));
+      });
 
+      document.body.appendChild(wrapper);
+      try {
+        return await html2canvas(wrapper, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      } finally {
+        document.body.removeChild(wrapper);
+      }
+    }
+
+    // 1枚のキャンバスを、重なりや欠けが出ないようページ単位で切り出してPDFに貼り付ける
+    // forceNewPageForFirstSlice=true の場合、このキャンバスの最初の断片から新しいページを開始する
+    function addCanvasToPdfPaginated(pdf, canvas, margin, forceNewPageForFirstSlice) {
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidthMm = pageWidth - margin * 2;
+      const pxPerMm = canvas.width / imgWidthMm;
+      const pageSlicePx = Math.max(1, Math.floor((pageHeight - margin * 2) * pxPerMm));
+
+      let renderedPx = 0;
+      let isFirstSlice = true;
+
+      while (renderedPx < canvas.height) {
+        const sliceHeightPx = Math.min(pageSlicePx, canvas.height - renderedPx);
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeightPx;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(canvas, 0, renderedPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+
+        const sliceImgData = pageCanvas.toDataURL('image/png');
+        const sliceHeightMm = sliceHeightPx / pxPerMm;
+
+        if (!isFirstSlice || forceNewPageForFirstSlice) {
+          pdf.addPage();
+        }
+        pdf.addImage(sliceImgData, 'PNG', margin, margin, imgWidthMm, sliceHeightMm);
+
+        renderedPx += sliceHeightPx;
+        isFirstSlice = false;
+      }
+    }
+
+    async function exportElementAsPdfBlob(elementId, orientation = 'portrait') {
+      const original = document.getElementById(elementId);
+      if (!original || typeof html2canvas === 'undefined' || !window.jspdf) return null;
+
+      const canvas = await captureElementsToCanvas([original]);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+      addCanvasToPdfPaginated(pdf, canvas, 10, false);
+      return pdf.output('blob');
+    }
+
+    // 出面表専用のPDF生成：現場ごとのブロック（📍見出し＋表）を1つずつ撮影し、
+    // ページをまたぐ場合は現場の切れ目で新しいページに分けるようにする
+    async function exportAttendancePdfBlob() {
+      if (typeof html2canvas === 'undefined' || !window.jspdf) return null;
+
+      const attendanceBox = document.getElementById('attendance-box');
+      const container = document.getElementById('report-attendance-table-container');
+      if (!attendanceBox || !container) return null;
+
+      const titleEl = attendanceBox.querySelector('.preview-title');
+      const subtitleEl = attendanceBox.querySelector('.preview-sub');
+
+      // 「📍現場名」の見出しと、その直後の表を1組ずつ取り出す
+      const blocks = [];
+      const children = Array.from(container.children);
+      for (let i = 0; i < children.length; i++) {
+        if (children[i].classList && children[i].classList.contains('site-banner')) {
+          blocks.push({ banner: children[i], table: children[i + 1] });
+          i++;
+        }
+      }
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const margin = 10;
+
+      if (blocks.length === 0) {
+        // 対象データが無い場合など、現場ブロックが無いときはそのまま1ページで出力
+        const canvas = await captureElementsToCanvas([titleEl, subtitleEl, container]);
+        addCanvasToPdfPaginated(pdf, canvas, margin, false);
+        return pdf.output('blob');
+      }
+
+      for (let idx = 0; idx < blocks.length; idx++) {
+        const { banner, table } = blocks[idx];
+        if (!table) continue;
+
+        const elementsToCapture = idx === 0
+          ? [titleEl, subtitleEl, banner, table]
+          : [banner, table];
+
+        const canvas = await captureElementsToCanvas(elementsToCapture);
+        addCanvasToPdfPaginated(pdf, canvas, margin, idx > 0);
+      }
+
+      return pdf.output('blob');
+    }
+
+    // Blobを showSaveFilePicker またはダウンロードリンクで保存する共通処理
+    async function saveBlobAsFile(blob, defaultFileName, pickerDescription, pickerAccept, successMessage) {
       if ('showSaveFilePicker' in window) {
         try {
           const handle = await window.showSaveFilePicker({
             suggestedName: defaultFileName,
-            types: [{
-              description: 'PDF Document',
-              accept: { 'application/pdf': ['.pdf'] },
-            }],
+            types: [{ description: pickerDescription, accept: pickerAccept }],
           });
           const writable = await handle.createWritable();
-          await writable.write(fullHtml);
+          await writable.write(blob);
           await writable.close();
-          alert('出面表ファイルを指定されたフォルダに保存しました。');
+          alert(successMessage);
           return;
         } catch (err) {
           if (err.name === 'AbortError') return;
         }
       }
 
-      // フォールバック処理
-      const blob = new Blob([fullHtml], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = defaultFileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = url; a.download = defaultFileName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function saveAttendancePDF() {
+      const monthStr = document.getElementById('report-month').value || '2026-09';
+      const [year, month] = monthStr.split('-').map(Number);
+      const clientId = parseInt(document.getElementById('report-client-select').value);
+      const siteId = parseInt(document.getElementById('report-site-select').value);
+      const client = masterData.clients.find(c => c.id === clientId);
+      const clientName = client ? client.name : '全社対象';
+      const site = masterData.sites.find(s => s.id === siteId);
+      const siteName = site ? site.name : '全現場対象';
+
+      const defaultFileName = `出面表${year}年${month}月${clientName}${siteName}.pdf`;
+
+      const pdfBlob = await exportAttendancePdfBlob();
+      if (!pdfBlob) { alert('PDFの作成に失敗しました。通信環境を確認して再度お試しください。'); return; }
+
+      await saveBlobAsFile(
+        pdfBlob, defaultFileName,
+        'PDF Document', { 'application/pdf': ['.pdf'] },
+        '出面表PDFを保存しました。'
+      );
+    }
+
+    async function saveInvoicePDF() {
+      const monthStr = document.getElementById('report-month').value || '2026-09';
+      const [year, month] = monthStr.split('-').map(Number);
+      const clientId = parseInt(document.getElementById('report-client-select').value);
+      const siteId = parseInt(document.getElementById('report-site-select').value);
+      const client = masterData.clients.find(c => c.id === clientId);
+      const clientName = client ? client.name : '全社対象';
+      const site = masterData.sites.find(s => s.id === siteId);
+      const siteName = site ? site.name : '全現場対象';
+
+      const defaultFileName = `${year}年${month}月${clientName}${siteName}請求書.pdf`;
+
+      const pdfBlob = await exportElementAsPdfBlob('invoice-box');
+      if (!pdfBlob) { alert('PDFの作成に失敗しました。通信環境を確認して再度お試しください。'); return; }
+
+      await saveBlobAsFile(
+        pdfBlob, defaultFileName,
+        'PDF Document', { 'application/pdf': ['.pdf'] },
+        '請求書PDFを保存しました。'
+      );
+    }
+
+    // 請求書設定（invoiceMappings）に保存されたテンプレートExcelを、
+    // 設定時と同じ内容で読み込み直す（保存済みのExcelファイルそのものを元に作成するため）
+    function getWorkbookForMapping(mapping) {
+      if (!mapping || !mapping.workbookBase64) return null;
+      try {
+        return XLSX.read(mapping.workbookBase64, { type: 'base64' });
+      } catch (e) {
+        console.error('テンプレートExcelの読み込みに失敗しました', e);
+        return null;
+      }
+    }
+
+    // ワークシートの使用範囲(!ref)を、明細行の追加に合わせて広げる
+    function extendSheetRange(ws, minRows) {
+      const ref = ws['!ref'] || 'A1:A1';
+      const range = XLSX.utils.decode_range(ref);
+      if (range.e.r + 1 < minRows) {
+        range.e.r = minRows - 1;
+        ws['!ref'] = XLSX.utils.encode_range(range);
+      }
+    }
+
+    // 請求書設定でマッピングしたセル位置に、自社情報・口座情報・宛名・明細等を書き込む共通処理
+    // （Excel出力／出面・請求書タブのプレビューの両方から利用する）
+    function applyMappingToWorksheet(ws, mapping, comp, clientName, invoiceItems, remarkText, totalWithTax) {
+      const writtenAddresses = [];
+      const setCell = (addr, type, val) => {
+        if (!addr) return;
+        ws[addr] = { t: type, v: val };
+        writtenAddresses.push(addr);
+      };
+
+      setCell(mapping.mapClient, 's', `${clientName} 御中`);
+      setCell(mapping.mapDate, 's', new Date().toLocaleDateString('ja-JP'));
+      setCell(mapping.mapTotal, 'n', totalWithTax);
+      setCell(mapping.mapRemark, 's', remarkText || '');
+
+      setCell(mapping.mapCompName, 's', comp.name || '');
+      setCell(mapping.mapCompOwner, 's', comp.owner || '');
+      setCell(mapping.mapCompZip, 's', comp.zip || '');
+      setCell(mapping.mapCompAddress, 's', comp.address || '');
+      setCell(mapping.mapCompTel, 's', comp.tel || '');
+      setCell(mapping.mapCompFax, 's', comp.fax || '');
+
+      setCell(mapping.mapBankName, 's', comp.bankName || '');
+      setCell(mapping.mapBankBranch, 's', comp.bankBranch || '');
+      setCell(mapping.mapBankType, 's', comp.bankType || '普通');
+      setCell(mapping.mapBankAccountNum, 's', comp.bankAccountNum || '');
+      setCell(mapping.mapBankAccountName, 's', comp.bankAccountName || '');
+
+      const startRow = parseInt(mapping.mapDetailStart) || 1;
+      invoiceItems.forEach((item, idx) => {
+        const r = startRow + idx;
+        if (mapping.mapColSite) setCell(`${mapping.mapColSite}${r}`, 's', `${item.name} 出面作業一式`);
+        if (mapping.mapColQty) setCell(`${mapping.mapColQty}${r}`, 'n', item.days);
+        if (mapping.mapColUnit) setCell(`${mapping.mapColUnit}${r}`, 's', '人工');
+        if (mapping.mapColPrice) setCell(`${mapping.mapColPrice}${r}`, 'n', item.days > 0 ? Math.round(item.amount / item.days) : 0);
+        if (mapping.mapColAmount) setCell(`${mapping.mapColAmount}${r}`, 'n', item.amount);
+      });
+
+      extendSheetRange(ws, startRow + invoiceItems.length + 1);
+      return writtenAddresses;
+    }
+
+    // マッピング済みワークシートを、出面・請求書タブ用の読み取り専用プレビュー表として描画する
+    function renderWorksheetAsPreviewTable(ws, highlightAddresses) {
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+      const maxRows = Math.min(range.e.r + 1, 80);
+      const maxCols = Math.min(range.e.c + 1, 26);
+      const highlightSet = new Set(highlightAddresses || []);
+
+      let html = '<div class="excel-table-container" style="max-height:420px; border:1px solid var(--border-color); border-radius:8px;"><table class="excel-grid">';
+      html += '<thead><tr><th></th>';
+      for (let c = 0; c < maxCols; c++) html += `<th>${XLSX.utils.encode_col(c)}</th>`;
+      html += '</tr></thead><tbody>';
+
+      for (let r = 0; r < maxRows; r++) {
+        html += `<tr><th>${r + 1}</th>`;
+        for (let c = 0; c < maxCols; c++) {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          const cell = ws[addr];
+          let displayVal = '';
+          if (cell) {
+            if (cell.w !== undefined) displayVal = cell.w;
+            else if (typeof cell.v === 'number') displayVal = cell.v.toLocaleString();
+            else displayVal = cell.v !== undefined && cell.v !== null ? cell.v : '';
+          }
+          const cls = highlightSet.has(addr) ? ' class="highlight-mapped"' : '';
+          html += `<td${cls}>${displayVal}</td>`;
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    async function saveInvoiceExcel() {
+      const monthStr = document.getElementById('report-month').value || '2026-09';
+      const [year, month] = monthStr.split('-').map(Number);
+      const clientId = parseInt(document.getElementById('report-client-select').value);
+      const siteId = parseInt(document.getElementById('report-site-select').value);
+      const templateKey = document.getElementById('report-template-select').value;
+      
+      const client = masterData.clients.find(c => c.id === clientId);
+      const clientName = client ? client.name : '全社対象';
+      const site = masterData.sites.find(s => s.id === siteId);
+      const siteName = site ? site.name : '全現場対象';
+      const comp = masterData.company || {};
+      const remarkText = document.getElementById('report-invoice-remark').value || '';
+
+      const defaultFileName = `${year}年${month}月${clientName}${siteName}請求書.xlsx`;
+
+      let targetSiteIds = [];
+      if (siteId) {
+        targetSiteIds = [siteId];
+      } else if (clientId) {
+        targetSiteIds = masterData.sites.filter(s => s.clientId === clientId).map(s => s.id);
+      } else {
+        targetSiteIds = masterData.sites.map(s => s.id);
+      }
+
+      const daysInMonth = new Date(year, month, 0).getDate();
+      let siteSummaries = {};
+
+      masterData.workers.forEach(w => {
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dayStr = String(d).padStart(2, '0');
+          const dateKey = `${monthStr}-${dayStr}`;
+          targetSiteIds.forEach(sId => {
+            const attKey = `${dateKey}_${sId}_${w.id}`;
+            const attVal = masterData.attendance[attKey] || 0;
+            if (attVal > 0) {
+              const priceKey = `${sId}-${w.id}`;
+              const unitPrice = masterData.prices[priceKey] || 0;
+              if (!siteSummaries[sId]) {
+                const sObj = masterData.sites.find(s => s.id === sId);
+                siteSummaries[sId] = { name: sObj ? sObj.name : '現場未特定', days: 0, amount: 0 };
+              }
+              siteSummaries[sId].days += attVal;
+              siteSummaries[sId].amount += (unitPrice * attVal);
+            }
+          });
+        }
+      });
+
+      const invoiceItems = Object.values(siteSummaries);
+      const grandTotal = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
+      const tax = Math.floor(grandTotal * 0.1);
+      const totalWithTax = grandTotal + tax;
+
+      const mapping = templateKey ? masterData.invoiceMappings[templateKey] : null;
+      const templateWb = mapping ? getWorkbookForMapping(mapping) : null;
+
+      let wb, ws;
+
+      if (mapping && templateWb) {
+        wb = templateWb;
+        const sheetName = wb.SheetNames[0];
+        ws = wb.Sheets[sheetName];
+
+        applyMappingToWorksheet(ws, mapping, comp, clientName, invoiceItems, remarkText, totalWithTax);
+
+      } else {
+        wb = XLSX.utils.book_new();
+        const aoa = [
+          ['御 請 求 書', '', '', '', ''],
+          ['', '', '', '', `請求日: ${new Date().toLocaleDateString('ja-JP')}`],
+          [`${clientName} 御中`, '', '', '', `${comp.name || 'まつお建設'}`],
+          ['', '', '', '', `TEL: ${comp.tel || ''}`],
+          ['', '', '', '', ''],
+          ['ご請求金額:', totalWithTax, '', '', ''],
+          ['', '', '', '', ''],
+          ['項目 / 現場名', '数量', '単位', '単価', '金額 (税抜)']
+        ];
+
+        invoiceItems.forEach(item => {
+          aoa.push([
+            `${item.name} 出面作業一式`, item.days, '人工',
+            item.days > 0 ? Math.round(item.amount / item.days) : 0, item.amount
+          ]);
+        });
+
+        aoa.push(['', '', '', '', '']);
+        aoa.push(['小計', '', '', '', grandTotal]);
+        aoa.push(['消費税 (10%)', '', '', '', tax]);
+        aoa.push(['合計 (税込)', '', '', '', totalWithTax]);
+        aoa.push(['', '', '', '', '']);
+        aoa.push(['【振込口座】', `${comp.bankName || ''} ${comp.bankBranch || ''} (${comp.bankType || '普通'}) ${comp.bankAccountNum || ''}`, '', '', '']);
+        aoa.push(['口座名義:', comp.bankAccountName || '', '', '', '']);
+        if (remarkText) aoa.push(['【備考】', remarkText, '', '', '']);
+
+        ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, '請求書');
+      }
+
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: defaultFileName,
+            types: [{ description: 'Excel Document', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          alert('請求書Excelファイルを指定されたフォルダに保存しました。');
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = defaultFileName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
 
@@ -622,9 +1293,7 @@
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       document.getElementById(pageId).classList.add('active');
       btn.classList.add('active');
-      if (pageId === 'page-report') {
-        generateReport();
-      }
+      if (pageId === 'page-report') generateReport();
     }
 
     function openSubTab(evt, tabId) {
@@ -632,15 +1301,21 @@
       document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
       evt.currentTarget.classList.add('active');
+
+      if (tabId === 'sub-tab-invoice-config') renderInvoiceMappingList();
+    }
+
+    function openInvoiceSubTab(evt, subId) {
+      document.querySelectorAll('.invoice-sub-content').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.invoice-sub-tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(subId).classList.add('active');
+      evt.currentTarget.classList.add('active');
     }
 
     function filterEntrySites() {
       const clientId = parseInt(document.getElementById('entry-client-select').value);
       const entrySiteSelect = document.getElementById('entry-site-select');
-
-      const filteredSites = clientId
-        ? masterData.sites.filter(s => s.clientId === clientId)
-        : masterData.sites;
+      const filteredSites = clientId ? masterData.sites.filter(s => s.clientId === clientId) : masterData.sites;
 
       entrySiteSelect.innerHTML = filteredSites.length > 0
         ? filteredSites.map(s => `<option value="${s.id}">${s.name}</option>`).join('')
@@ -694,10 +1369,7 @@
     function filterReportSites() {
       const clientId = parseInt(document.getElementById('report-client-select').value);
       const reportSiteSelect = document.getElementById('report-site-select');
-      
-      const filteredSites = clientId 
-        ? masterData.sites.filter(s => s.clientId === clientId)
-        : masterData.sites;
+      const filteredSites = clientId ? masterData.sites.filter(s => s.clientId === clientId) : masterData.sites;
 
       reportSiteSelect.innerHTML = '<option value="">全現場対象</option>' + 
         filteredSites.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
@@ -706,15 +1378,19 @@
     function generateReport() {
       const clientId = parseInt(document.getElementById('report-client-select').value);
       const siteId = parseInt(document.getElementById('report-site-select').value);
+      const templateKey = document.getElementById('report-template-select').value;
       const monthStr = document.getElementById('report-month').value;
+      const remarkText = document.getElementById('report-invoice-remark').value;
 
       const client = masterData.clients.find(c => c.id === clientId);
       const clientName = client ? client.name : '全社対象';
       const site = masterData.sites.find(s => s.id === siteId);
       const siteName = site ? site.name : '全現場対象';
+      const comp = masterData.company || {};
 
       document.getElementById('report-attendance-subtitle').innerText = `${monthStr.replace('-', '年')}月分（元請：${clientName} 御中 / 現場：${siteName}）`;
       document.getElementById('report-invoice-client-name').innerText = `${clientName} 御中`;
+      document.getElementById('report-invoice-company-name').innerText = comp.name || 'まつお建設';
       document.getElementById('report-invoice-date').innerText = new Date().toLocaleDateString('ja-JP');
 
       if (!monthStr) return;
@@ -732,66 +1408,81 @@
         targetSiteIds = masterData.sites.map(s => s.id);
       }
 
-      let tableHtml = `<table class="report-table"><thead><tr><th>名前</th>`;
-      for (let d = 1; d <= daysInMonth; d++) {
-        tableHtml += `<th>${d}</th>`;
-      }
-      tableHtml += `<th rowspan="2" style="vertical-align:middle;">計</th></tr><tr><th style="font-size:10px; color:var(--text-muted);">曜日</th>`;
+      // 出面表ヘッダー（日付・曜日）は現場ごとのテーブルで共通利用する（名前列は一番左）
+      let headerRowsHtml = `<tr><th>名前</th>`;
+      for (let d = 1; d <= daysInMonth; d++) headerRowsHtml += `<th>${d}</th>`;
+      headerRowsHtml += `<th rowspan="2" style="vertical-align:middle;">計</th></tr><tr><th style="font-size:10px; color:var(--text-muted);">曜日</th>`;
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateObj = new Date(year, month - 1, d);
         const dayOfWeek = dateObj.getDay();
-        const dayName = weekDays[dayOfWeek];
-        
         let style = '';
         if (dayOfWeek === 0) style = 'color: #ef4444;';
         if (dayOfWeek === 6) style = 'color: #3b82f6;';
-
-        tableHtml += `<th style="${style}">${dayName}</th>`;
+        headerRowsHtml += `<th style="${style}">${weekDays[dayOfWeek]}</th>`;
       }
-      tableHtml += `</tr></thead><tbody>`;
+      headerRowsHtml += `</tr>`;
 
-      let invoiceItems = [];
+      let siteSummaries = {};
+      let attendanceHtml = '';
 
-      masterData.workers.forEach(w => {
-        let rowHtml = `<tr><td style="font-weight:bold; white-space:nowrap; text-align:left; padding:4px 6px;">${w.name}</td>`;
-        let totalDays = 0;
-        let totalAmount = 0;
+      // 現場ごとに表を分け、「いつ・誰が」その現場に入っていたかが分かる構成にする
+      targetSiteIds.forEach(sId => {
+        const sObj = masterData.sites.find(s => s.id === sId);
+        const siteLabel = sObj ? sObj.name : '現場未特定';
 
-        for (let d = 1; d <= daysInMonth; d++) {
-          const dayStr = String(d).padStart(2, '0');
-          const dateKey = `${monthStr}-${dayStr}`;
+        let siteBodyHtml = '';
+        let siteHasData = false;
 
-          let dayValSum = 0;
-          targetSiteIds.forEach(sId => {
+        masterData.workers.forEach(w => {
+          let rowHtml = `<tr><td style="font-weight:bold; white-space:nowrap; text-align:left; padding:4px 6px;">${w.name}</td>`;
+          let totalDays = 0;
+          let workerHasData = false;
+
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dayStr = String(d).padStart(2, '0');
+            const dateKey = `${monthStr}-${dayStr}`;
             const attKey = `${dateKey}_${sId}_${w.id}`;
-            if (masterData.attendance[attKey]) {
-              dayValSum += masterData.attendance[attKey];
+            const attVal = masterData.attendance[attKey] || 0;
+
+            if (attVal > 0) {
+              workerHasData = true;
+              siteHasData = true;
+              totalDays += attVal;
+
               const priceKey = `${sId}-${w.id}`;
               const unitPrice = masterData.prices[priceKey] || 0;
-              totalAmount += (unitPrice * masterData.attendance[attKey]);
+              if (!siteSummaries[sId]) {
+                siteSummaries[sId] = { name: siteLabel, days: 0, amount: 0, unitPrice: unitPrice };
+              }
+              siteSummaries[sId].days += attVal;
+              siteSummaries[sId].amount += (unitPrice * attVal);
             }
-          });
 
-          totalDays += dayValSum;
-          rowHtml += `<td>${dayValSum > 0 ? dayValSum : ''}</td>`;
-        }
+            rowHtml += `<td>${attVal > 0 ? attVal : ''}</td>`;
+          }
 
-        rowHtml += `<td style="font-weight:bold; background-color:#f1f5f9;">${totalDays > 0 ? totalDays : 0}</td></tr>`;
-        tableHtml += rowHtml;
+          rowHtml += `<td style="font-weight:bold; background-color:#f1f5f9;">${totalDays > 0 ? totalDays : 0}</td></tr>`;
+          if (workerHasData) siteBodyHtml += rowHtml;
+        });
 
-        if (totalDays > 0) {
-          invoiceItems.push({
-            name: w.name,
-            days: totalDays,
-            amount: totalAmount
-          });
+        if (siteHasData) {
+          attendanceHtml += `
+            <div class="site-banner" style="${attendanceHtml ? 'margin-top:16px;' : ''}">
+              <span>📍 ${siteLabel}</span>
+            </div>
+            <table class="report-table"><thead>${headerRowsHtml}</thead><tbody>${siteBodyHtml}</tbody></table>
+          `;
         }
       });
 
-      tableHtml += `</tbody></table>`;
-      document.getElementById('report-attendance-table-container').innerHTML = tableHtml;
+      if (!attendanceHtml) {
+        attendanceHtml = `<div style="padding:14px; color:var(--text-muted); font-size:12px;">対象期間の出面データがありません</div>`;
+      }
 
+      document.getElementById('report-attendance-table-container').innerHTML = attendanceHtml;
+
+      let invoiceItems = Object.values(siteSummaries);
       let grandTotal = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
       let tax = Math.floor(grandTotal * 0.1);
       let totalWithTax = grandTotal + tax;
@@ -800,8 +1491,10 @@
         <table class="invoice-table" style="margin-bottom:12px;">
           <thead>
             <tr bgColor="#f8fafc">
-              <th style="text-align:left; padding:6px;">項目 / 作業員名</th>
-              <th>人工数</th>
+              <th style="text-align:left; padding:6px;">項目 / 現場名</th>
+              <th>数量</th>
+              <th>単位</th>
+              <th style="text-align:right;">単価</th>
               <th style="text-align:right; padding:6px;">金額 (税込)</th>
             </tr>
           </thead>
@@ -809,20 +1502,20 @@
       `;
 
       if (invoiceItems.length === 0) {
-        invoiceHtml += `<tr><td colspan="3" style="padding:10px; color:var(--text-muted);">対象期間の出面データがありません</td></tr>`;
+        invoiceHtml += `<tr><td colspan="5" style="padding:10px; color:var(--text-muted);">対象期間の出面データがありません</td></tr>`;
       } else {
         invoiceItems.forEach(item => {
           invoiceHtml += `
             <tr>
-              <td style="text-align:left; padding:6px;">${item.name} 出面作業</td>
-              <td>${item.days} 工数</td>
+              <td style="text-align:left; padding:6px;">${item.name} 出面作業一式</td>
+              <td>${item.days}</td>
+              <td>人工</td>
+              <td style="text-align:right;">¥${(item.days > 0 ? Math.round(item.amount / item.days) : 0).toLocaleString()}</td>
               <td style="text-align:right; padding:6px;">¥${item.amount.toLocaleString()}</td>
             </tr>
           `;
         });
       }
-
-      const comp = masterData.company || {};
 
       invoiceHtml += `
           </tbody>
@@ -833,7 +1526,8 @@
             <div>${comp.bankName || '〇〇銀行'} ${comp.bankBranch || '本店営業部'} (${comp.bankType || '普通'}) ${comp.bankAccountNum || '1234567'}</div>
             <div>口座名義: ${comp.bankAccountName || '自社口座名義'}</div>
           </div>
-          <div style="text-align:right;">
+          ${remarkText ? `<div style="font-size:11px; background:#f8fafc; border:1px solid #cbd5e1; padding:6px 8px; border-radius:4px;"><strong>【備考】</strong><br>${remarkText.replace(/\n/g, '<br>')}</div>` : ''}
+          <div style="text-align:right; margin-top:4px;">
             <div style="font-size:11px;">小計: ¥${grandTotal.toLocaleString()} / 消費税(10%): ¥${tax.toLocaleString()}</div>
             <div style="font-size:16px; font-weight:bold; color:var(--text-main);">合計請求額: ¥${totalWithTax.toLocaleString()}</div>
           </div>
@@ -841,13 +1535,282 @@
       `;
 
       document.getElementById('report-invoice-detail-container').innerHTML = invoiceHtml;
+
+      const mapping = templateKey ? masterData.invoiceMappings[templateKey] : null;
+      const templateWb = mapping ? getWorkbookForMapping(mapping) : null;
+      const mappingStatusEl = document.getElementById('report-invoice-mapping-info');
+
+      if (mapping && templateWb) {
+        // 設定で保存したテンプレートExcelそのものに、マッピングした位置で値を書き込んでプレビュー表示する
+        const sheetName = templateWb.SheetNames[0];
+        const ws = templateWb.Sheets[sheetName];
+        const writtenAddresses = applyMappingToWorksheet(ws, mapping, comp, clientName, invoiceItems, remarkText, totalWithTax);
+        document.getElementById('report-invoice-detail-container').innerHTML = renderWorksheetAsPreviewTable(ws, writtenAddresses);
+        mappingStatusEl.innerText = `適用設定: ${templateKey} (${mapping.fileName || 'カスタム様式'}) のExcelレイアウトで表示中`;
+      } else if (mapping) {
+        mappingStatusEl.innerText = `適用設定: ${templateKey} — テンプレートExcelが見つからないため標準レイアウトで表示しています`;
+      } else {
+        mappingStatusEl.innerText = `標準請求書レイアウト表示中`;
+      }
+    }
+
+    let tempTemplateFileName = '';
+    let tempTemplateFileBase64 = '';
+
+    // ArrayBuffer -> base64文字列（テンプレートExcelを設定として保存するため）
+    function arrayBufferToBase64(buffer) {
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      return window.btoa(binary);
+    }
+
+    function handleTemplateUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      tempTemplateFileName = file.name;
+      document.getElementById('template-file-status').innerText = `選択中: ${file.name}`;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        loadedWorkbook = XLSX.read(data, { type: 'array' });
+        tempTemplateFileBase64 = arrayBufferToBase64(evt.target.result);
+        const firstSheetName = loadedWorkbook.SheetNames[0];
+        const worksheet = loadedWorkbook.Sheets[firstSheetName];
+        renderExcelGrid(worksheet);
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function renderExcelGrid(worksheet) {
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
+      const maxRows = Math.min(range.e.r + 1, 50);
+      const maxCols = Math.min(range.e.c + 1, 26);
+
+      let html = '<div class="excel-table-container"><table class="excel-grid">';
+      html += '<thead><tr><th></th>';
+      for (let c = 0; c < maxCols; c++) {
+        html += `<th>${XLSX.utils.encode_col(c)}</th>`;
+      }
+      html += '</tr></thead><tbody>';
+
+      for (let r = 0; r < maxRows; r++) {
+        const rowNum = r + 1;
+        html += `<tr><th>${rowNum}</th>`;
+        for (let c = 0; c < maxCols; c++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: r, c: c });
+          const cell = worksheet[cellAddress];
+          const cellValue = cell ? (cell.w || cell.v || '') : '';
+          html += `<td id="cell-${cellAddress}" onclick="onCellClick('${cellAddress}', ${rowNum}, '${XLSX.utils.encode_col(c)}')">${cellValue}</td>`;
+        }
+        html += '</tr>';
+      }
+      
+      html += '</tbody></table></div>';
+      document.getElementById('previewArea').innerHTML = html;
+      refreshHighlights();
+    }
+
+    function activateMapping(fieldKey) {
+      currentActiveField = fieldKey;
+      document.querySelectorAll('.mapping-item').forEach(el => el.classList.remove('active'));
+      const activeEl = document.getElementById(`item-${fieldKey}`);
+      if (activeEl) activeEl.classList.add('active');
+      
+      const statusEl = document.getElementById('excel-active-status');
+      if (statusEl) statusEl.innerText = `「${fieldKey}」の対象セルをクリック`;
+      
+      refreshHighlights();
+    }
+
+    function skipMapping(fieldKey) {
+      const elMap = { 'col_qty': 'map-col-qty', 'col_unit': 'map-col-unit', 'col_price': 'map-col-price' };
+      if (elMap[fieldKey]) document.getElementById(elMap[fieldKey]).value = '';
+      if (currentActiveField === fieldKey) {
+        currentActiveField = null;
+        document.getElementById(`item-${fieldKey}`).classList.remove('active');
+      }
+      refreshHighlights();
+    }
+
+    function onCellClick(cellAddress, rowNum, colLetter) {
+      if (!currentActiveField) {
+        alert('先に設定したい項目の「選択」ボタンを押してください。');
+        return;
+      }
+
+      if (currentActiveField === 'comp_name') document.getElementById('map-comp-name').value = cellAddress;
+      if (currentActiveField === 'comp_owner') document.getElementById('map-comp-owner').value = cellAddress;
+      if (currentActiveField === 'comp_zip') document.getElementById('map-comp-zip').value = cellAddress;
+      if (currentActiveField === 'comp_address') document.getElementById('map-comp-address').value = cellAddress;
+      if (currentActiveField === 'comp_tel') document.getElementById('map-comp-tel').value = cellAddress;
+      if (currentActiveField === 'comp_fax') document.getElementById('map-comp-fax').value = cellAddress;
+      if (currentActiveField === 'bank_name') document.getElementById('map-bank-name').value = cellAddress;
+      if (currentActiveField === 'bank_branch') document.getElementById('map-bank-branch').value = cellAddress;
+      if (currentActiveField === 'bank_type') document.getElementById('map-bank-type').value = cellAddress;
+      if (currentActiveField === 'bank_account_num') document.getElementById('map-bank-account-num').value = cellAddress;
+      if (currentActiveField === 'bank_account_name') document.getElementById('map-bank-account-name').value = cellAddress;
+
+      if (currentActiveField === 'client') document.getElementById('map-client').value = cellAddress;
+      if (currentActiveField === 'date') document.getElementById('map-date').value = cellAddress;
+      if (currentActiveField === 'total') document.getElementById('map-total').value = cellAddress;
+      if (currentActiveField === 'remark') document.getElementById('map-remark').value = cellAddress;
+      if (currentActiveField === 'detail_start') document.getElementById('map-detail-start').value = rowNum;
+      if (currentActiveField === 'col_site') document.getElementById('map-col-site').value = colLetter;
+      if (currentActiveField === 'col_qty') document.getElementById('map-col-qty').value = colLetter;
+      if (currentActiveField === 'col_unit') document.getElementById('map-col-unit').value = colLetter;
+      if (currentActiveField === 'col_price') document.getElementById('map-col-price').value = colLetter;
+      if (currentActiveField === 'col_amount') document.getElementById('map-col-amount').value = colLetter;
+
+      currentActiveField = null;
+      document.querySelectorAll('.mapping-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('excel-active-status').innerText = 'セルが選択されました';
+      refreshHighlights();
+    }
+
+    function refreshHighlights() {
+      document.querySelectorAll('#previewArea td').forEach(td => td.classList.remove('highlight-mapped'));
+      const cells = [
+        document.getElementById('map-comp-name').value, document.getElementById('map-comp-owner').value,
+        document.getElementById('map-comp-zip').value, document.getElementById('map-comp-address').value,
+        document.getElementById('map-comp-tel').value, document.getElementById('map-comp-fax').value,
+        document.getElementById('map-bank-name').value, document.getElementById('map-bank-branch').value,
+        document.getElementById('map-bank-type').value, document.getElementById('map-bank-account-num').value,
+        document.getElementById('map-bank-account-name').value,
+        document.getElementById('map-client').value, document.getElementById('map-date').value,
+        document.getElementById('map-total').value, document.getElementById('map-remark').value
+      ];
+      cells.forEach(cell => {
+        if (cell) {
+          const el = document.getElementById(`cell-${cell}`);
+          if (el) el.classList.add('highlight-mapped');
+        }
+      });
+    }
+
+    function saveClientInvoiceMapping() {
+      const templateName = document.getElementById('config-template-name').value.trim();
+      if (!templateName) return alert('請求名称を入力してください');
+
+      if (!masterData.invoiceMappings[templateName]) masterData.invoiceMappings[templateName] = {};
+
+      const m = masterData.invoiceMappings[templateName];
+      m.fileName = tempTemplateFileName || m.fileName || '';
+      m.workbookBase64 = tempTemplateFileBase64 || m.workbookBase64 || '';
+
+      m.mapCompName = document.getElementById('map-comp-name').value;
+      m.mapCompOwner = document.getElementById('map-comp-owner').value;
+      m.mapCompZip = document.getElementById('map-comp-zip').value;
+      m.mapCompAddress = document.getElementById('map-comp-address').value;
+      m.mapCompTel = document.getElementById('map-comp-tel').value;
+      m.mapCompFax = document.getElementById('map-comp-fax').value;
+      m.mapBankName = document.getElementById('map-bank-name').value;
+      m.mapBankBranch = document.getElementById('map-bank-branch').value;
+      m.mapBankType = document.getElementById('map-bank-type').value;
+      m.mapBankAccountNum = document.getElementById('map-bank-account-num').value;
+      m.mapBankAccountName = document.getElementById('map-bank-account-name').value;
+
+      m.mapClient = document.getElementById('map-client').value;
+      m.mapDate = document.getElementById('map-date').value;
+      m.mapTotal = document.getElementById('map-total').value;
+      m.mapRemark = document.getElementById('map-remark').value;
+      m.mapDetailStart = document.getElementById('map-detail-start').value;
+      m.mapColSite = document.getElementById('map-col-site').value;
+      m.mapColQty = document.getElementById('map-col-qty').value;
+      m.mapColUnit = document.getElementById('map-col-unit').value;
+      m.mapColPrice = document.getElementById('map-col-price').value;
+      m.mapColAmount = document.getElementById('map-col-amount').value;
+
+      saveData();
+      alert(`請求書設定「${templateName}」を保存しました`);
+      renderInvoiceMappingList();
+    }
+
+    function loadInvoiceMappingToForm(key) {
+      const m = masterData.invoiceMappings[key];
+      if (!m) return;
+      document.getElementById('config-template-name').value = key;
+
+      document.getElementById('map-comp-name').value = m.mapCompName || '';
+      document.getElementById('map-comp-owner').value = m.mapCompOwner || '';
+      document.getElementById('map-comp-zip').value = m.mapCompZip || '';
+      document.getElementById('map-comp-address').value = m.mapCompAddress || '';
+      document.getElementById('map-comp-tel').value = m.mapCompTel || '';
+      document.getElementById('map-comp-fax').value = m.mapCompFax || '';
+      document.getElementById('map-bank-name').value = m.mapBankName || '';
+      document.getElementById('map-bank-branch').value = m.mapBankBranch || '';
+      document.getElementById('map-bank-type').value = m.mapBankType || '';
+      document.getElementById('map-bank-account-num').value = m.mapBankAccountNum || '';
+      document.getElementById('map-bank-account-name').value = m.mapBankAccountName || '';
+
+      document.getElementById('map-client').value = m.mapClient || '';
+      document.getElementById('map-date').value = m.mapDate || '';
+      document.getElementById('map-total').value = m.mapTotal || '';
+      document.getElementById('map-remark').value = m.mapRemark || '';
+      document.getElementById('map-detail-start').value = m.mapDetailStart || '';
+      document.getElementById('map-col-site').value = m.mapColSite || '';
+      document.getElementById('map-col-qty').value = m.mapColQty || '';
+      document.getElementById('map-col-unit').value = m.mapColUnit || '';
+      document.getElementById('map-col-price').value = m.mapColPrice || '';
+      document.getElementById('map-col-amount').value = m.mapColAmount || '';
+      document.getElementById('template-file-status').innerText = m.fileName ? `登録済ファイル: ${m.fileName}` : '';
+      tempTemplateFileName = m.fileName || '';
+      tempTemplateFileBase64 = m.workbookBase64 || '';
+
+      if (m.workbookBase64) {
+        try {
+          loadedWorkbook = XLSX.read(m.workbookBase64, { type: 'base64' });
+          const firstSheetName = loadedWorkbook.SheetNames[0];
+          renderExcelGrid(loadedWorkbook.Sheets[firstSheetName]);
+        } catch (e) {
+          console.error('テンプレートExcelの読み込みに失敗しました', e);
+        }
+      }
+      refreshHighlights();
+    }
+
+    function deleteInvoiceMapping(key) {
+      if (!confirm(`設定「${key}」を削除しますか？`)) return;
+      delete masterData.invoiceMappings[key];
+      saveData();
+      renderInvoiceMappingList();
+    }
+
+    function renderInvoiceMappingList() {
+      const container = document.getElementById('invoice-mapping-list-container');
+      const keys = Object.keys(masterData.invoiceMappings);
+
+      if (keys.length === 0) {
+        container.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">登録されている請求書設定はありません</div>';
+        return;
+      }
+
+      container.innerHTML = keys.map(k => {
+        const item = masterData.invoiceMappings[k];
+        return `
+          <div style="display:flex; justify-content:space-between; align-items:center; border:1px solid #e2e8f0; padding:10px; border-radius:8px; margin-bottom:8px; background:#fff;">
+            <div>
+              <div style="font-weight:bold; font-size:14px;">${k}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${item.fileName ? 'ファイル: ' + item.fileName : '標準設定'}</div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn-sm btn-select" onclick="loadInvoiceMappingToForm('${k}')">編集</button>
+              <button class="btn-delete" onclick="deleteInvoiceMapping('${k}')">削除</button>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function addWorker() {
       const name = document.getElementById('input-worker-name').value.trim();
       const type = document.getElementById('input-worker-type').value;
       if (!name) return alert('名前/機械名を入力してください');
-      
       masterData.workers.push({ id: Date.now(), name, type });
       document.getElementById('input-worker-name').value = '';
       saveData();
@@ -878,7 +1841,6 @@
       const name = document.getElementById('input-client-name').value.trim();
       const closing = document.getElementById('input-client-closing').value;
       if (!name) return alert('元請会社名を入力してください');
-
       masterData.clients.push({ id: Date.now(), name, closing });
       document.getElementById('input-client-name').value = '';
       saveData();
@@ -911,7 +1873,6 @@
       const name = document.getElementById('input-site-name').value.trim();
       if (!clientId) return alert('元請会社を選択してください');
       if (!name) return alert('現場名を入力してください');
-
       masterData.sites.push({ id: Date.now(), name, clientId });
       document.getElementById('input-site-name').value = '';
       saveData();
@@ -944,10 +1905,7 @@
     function filterPriceSites() {
       const clientId = parseInt(document.getElementById('price-client-select').value);
       const priceSiteSelect = document.getElementById('price-site-select');
-
-      const filteredSites = clientId
-        ? masterData.sites.filter(s => s.clientId === clientId)
-        : masterData.sites;
+      const filteredSites = clientId ? masterData.sites.filter(s => s.clientId === clientId) : masterData.sites;
 
       priceSiteSelect.innerHTML = filteredSites.length > 0
         ? filteredSites.map(s => `<option value="${s.id}">${s.name}</option>`).join('')
@@ -998,9 +1956,9 @@
         bankName: document.getElementById('bank-name').value,
         bankBranch: document.getElementById('bank-branch').value,
         bankType: document.getElementById('bank-type').value,
-        bankBranchNum: document.getElementById('bank-branch-num').value,
         bankAccountNum: document.getElementById('bank-account-num').value,
         bankAccountName: document.getElementById('bank-account-name').value,
+        _mappingMigrated: true
       };
       saveData();
       alert('自社情報を保存しました');
@@ -1017,7 +1975,6 @@
       if (c.bankName) document.getElementById('bank-name').value = c.bankName;
       if (c.bankBranch) document.getElementById('bank-branch').value = c.bankBranch;
       if (c.bankType) document.getElementById('bank-type').value = c.bankType;
-      if (c.bankBranchNum) document.getElementById('bank-branch-num').value = c.bankBranchNum;
       if (c.bankAccountNum) document.getElementById('bank-account-num').value = c.bankAccountNum;
       if (c.bankAccountName) document.getElementById('bank-account-name').value = c.bankAccountName;
     }
@@ -1036,6 +1993,11 @@
       const reportClientSelect = document.getElementById('report-client-select');
       reportClientSelect.innerHTML = '<option value="">全社対象</option>' + 
         masterData.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      const reportTemplateSelect = document.getElementById('report-template-select');
+      const templateKeys = Object.keys(masterData.invoiceMappings);
+      reportTemplateSelect.innerHTML = '<option value="">標準フォーマット</option>' + 
+        templateKeys.map(k => `<option value="${k}">${k}</option>`).join('');
 
       filterReportSites();
 
@@ -1066,6 +2028,7 @@
       renderDropdowns();
       renderEntryWorkers();
       updateEntrySiteBanner();
+      renderInvoiceMappingList();
       generateReport();
     }
 
